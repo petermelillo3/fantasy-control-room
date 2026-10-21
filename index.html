@@ -1,0 +1,623 @@
+<title>Fantasy Control Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: field-style header with a season ruler, one card per team (trend line), league heat table, then one team's lineups drawn as bars on a shared scale. Dark first, light variant below. */
+  :root{
+    --bg:#0c110f; --panel:#141a17; --panel2:#1a221e; --line:#27322c;
+    --ink:#eef2ee; --ink2:#b0bbb3; --ink3:#8d9b92;
+    --turf:#4c9e6c; --on-turf:#08100b;
+    --gold:#e3b23c; --gold-ink:#e3b23c; --on-gold:#0d1210;
+    --bad:#e0705c; --neutral:#4a5750; --stripe:rgba(255,255,255,.035);
+    --a-eddie:#5b9bd5; --a-redraft:#4c9e6c; --a-mdyn:#e3b23c; --a-dphi:#b48ae0;
+    --display:'Teko','Arial Narrow',sans-serif;
+    --body:'Work Sans',system-ui,sans-serif;
+    color-scheme:dark;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#eef2ee; --panel:#ffffff; --panel2:#e6ede7; --line:#cbd6ce;
+      --ink:#142019; --ink2:#425248; --ink3:#5a6b60;
+      --turf:#2f7a4d; --on-turf:#ffffff;
+      --gold:#d9a21b; --gold-ink:#8a6400; --on-gold:#142019;
+      --bad:#b03a28; --neutral:#a9b6ad; --stripe:rgba(0,0,0,.035);
+      --a-eddie:#2f6fae; --a-redraft:#2f7a4d; --a-mdyn:#b07d00; --a-dphi:#7a4fb8;
+      color-scheme:light;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2ee; --panel:#ffffff; --panel2:#e6ede7; --line:#cbd6ce;
+    --ink:#142019; --ink2:#425248; --ink3:#5a6b60;
+    --turf:#2f7a4d; --on-turf:#ffffff;
+    --gold:#d9a21b; --gold-ink:#8a6400; --on-gold:#142019;
+    --bad:#b03a28; --neutral:#a9b6ad; --stripe:rgba(0,0,0,.035);
+    --a-eddie:#2f6fae; --a-redraft:#2f7a4d; --a-mdyn:#b07d00; --a-dphi:#7a4fb8;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;padding-inline:16px;padding-block:0 64px}
+  .wrap{max-width:1060px;margin-inline:auto}
+  h1,h2,h3{font-family:var(--display);font-weight:500;margin:0;text-wrap:balance}
+  h2{font-size:28px;line-height:1.05}
+  h3{font-size:21px}
+
+  /* header */
+  header.top{
+    margin-inline:-16px;padding:34px 16px 22px;margin-bottom:24px;
+    background:
+      linear-gradient(180deg,color-mix(in srgb,var(--turf) 26%,var(--bg)),var(--bg)),
+      repeating-linear-gradient(90deg,var(--stripe) 0 64px,transparent 64px 128px);
+    border-bottom:1px solid var(--line);
+  }
+  .top-in{max-width:1060px;margin-inline:auto;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px 40px;align-items:end}
+  @media (max-width:760px){.top-in{grid-template-columns:1fr}}
+  .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-ink);font-weight:600}
+  h1{font-weight:600;font-size:clamp(46px,10vw,84px);line-height:.9;margin:6px 0 10px}
+  .sub{color:var(--ink2);max-width:56ch;margin:0}
+  .score{display:flex;gap:28px;flex-wrap:wrap}
+  .score .n{font-family:var(--display);font-size:clamp(48px,8vw,68px);line-height:.9;font-weight:600;font-variant-numeric:tabular-nums}
+  .score .n.g{color:var(--gold-ink)}
+  .score .l{font-size:12.5px;color:var(--ink2);max-width:22ch;line-height:1.35;margin-top:4px}
+  .ruler{max-width:1060px;margin:22px auto 0}
+  .ruler .ticks{display:grid;grid-template-columns:repeat(18,1fr);gap:3px}
+  .ruler .ticks i{display:block;height:10px;background:var(--line)}
+  .ruler .ticks i.done{background:var(--turf)}
+  .ruler .ticks i.now{background:var(--gold);height:16px;align-self:end}
+  .ruler .cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:6px}
+
+  /* team cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));gap:14px;margin-bottom:24px}
+  .tcard{
+    text-align:left;font:inherit;color:inherit;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--a);
+    padding:14px 16px 12px;display:grid;gap:6px;min-width:0;
+  }
+  .tcard:hover{background:var(--panel2)}
+  .tcard[aria-pressed="true"]{outline:2px solid var(--a);outline-offset:-2px;background:var(--panel2)}
+  .tcard:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .tc-name{font-family:var(--display);font-size:25px;line-height:1.05;display:block}
+  .tc-sub{font-size:11.5px;color:var(--ink3);display:block}
+  .tc-big{font-family:var(--display);font-size:46px;font-weight:600;line-height:.95;font-variant-numeric:tabular-nums;display:block;margin-top:4px}
+  .tc-big small{font-family:var(--body);font-size:12px;font-weight:400;color:var(--ink2);margin-left:6px}
+  .tc-foot{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink2);flex-wrap:wrap}
+  .tc-foot b{color:var(--ink);font-weight:600}
+  .tc-foot b.g{color:var(--gold-ink)}
+  svg.spark{display:block;width:100%;height:auto}
+  .spark-empty{font-size:12px;color:var(--ink3);height:56px;display:flex;align-items:center}
+
+  /* panels */
+  .panel{background:var(--panel);border:1px solid var(--line);margin-bottom:20px;min-width:0}
+  .panel>.hd{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap}
+  .meta{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .pad{padding:14px 16px}
+  .note{color:var(--ink3);font-size:12.5px}
+  .tabs{display:flex;gap:8px;margin:0 0 20px;flex-wrap:wrap}
+  .tabbtn{font-family:var(--display);font-size:22px;letter-spacing:.04em;background:none;color:var(--ink2);border:1px solid var(--line);padding:2px 20px;cursor:pointer}
+  .tabbtn:hover{background:var(--panel2)}
+  .tabbtn[aria-selected="true"]{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+  .tabbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .legh{font-family:var(--display);font-size:clamp(40px,7vw,56px);line-height:.95;margin:0 0 6px;letter-spacing:.03em}
+  .legintro{padding-left:0;padding-right:0}
+  [hidden]{display:none!important}
+  .lrow{display:grid;grid-template-columns:minmax(150px,1.1fr) 3fr;gap:6px 16px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .lrow .who b{display:block}
+  .lrow .ms{display:flex;flex-direction:column;gap:5px}
+  .lrow .m{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .lrow .m .hit{font-family:var(--display);font-size:20px;line-height:1;min-width:2.4em;font-variant-numeric:tabular-nums}
+  .lrow .m .hit.all{color:var(--gold)}
+  .lrow .vals{color:var(--ink3);font-size:12.5px;font-variant-numeric:tabular-nums}
+  .own{font-size:10.5px;font-weight:700;letter-spacing:.06em;background:var(--gold);color:var(--on-gold);padding:1px 7px;margin-left:6px;white-space:nowrap}
+  @media(max-width:560px){.lrow{grid-template-columns:1fr}}
+  .best{border:1px solid var(--gold);padding:12px 16px;margin-bottom:16px;background:var(--panel2)}
+  .best:empty{display:none}
+  .bbh{font-family:var(--display);font-size:24px;margin:0 0 6px;letter-spacing:.03em}
+  .bbl{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 20px}
+  .bbl .hit{font-family:var(--display);font-size:18px}
+  .mu{font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:1px 7px;white-space:nowrap;border:1px solid var(--line);cursor:help}
+  .mu.soft{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+  .mu.tough{color:var(--bad);border-color:var(--bad)}
+  .mu.mid{color:var(--ink3)}
+  .nx{display:block}
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .sg{border:1px solid var(--line);padding:10px 12px;background:var(--panel)}
+  .sgt{font-family:var(--display);font-size:20px;letter-spacing:.03em;display:block;margin-bottom:6px}
+  .bbl1{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .bbl1 .hit{font-family:var(--display);font-size:18px}
+  .tablewrap{overflow-x:auto}
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);font-weight:500;text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  th.n{text-align:right}
+  td.c{text-align:right;font-family:var(--display);font-size:20px}
+  .muted{color:var(--ink3)}
+  a{color:var(--gold-ink)}
+
+  /* team detail */
+  #detail{scroll-margin-top:12px}
+  .dhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .dot{width:14px;height:44px;background:var(--a)}
+  .dhead h2{font-size:clamp(34px,6vw,46px);line-height:.95}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .chip{font-size:11px;padding:2px 8px;border:1px solid var(--line);color:var(--ink2);background:var(--panel2)}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .pill{font-family:var(--display);font-size:21px;background:none;color:var(--ink2);border:1px solid var(--line);padding:1px 16px;cursor:pointer}
+  .pill:hover:not([disabled]){background:var(--panel2)}
+  .pill[aria-pressed="true"]{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+  .pill[disabled]{opacity:.4;cursor:default}
+  .pill:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:18px}
+  .stat{background:var(--panel);padding:12px 14px}
+  .stat .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)}
+  .stat .v{font-family:var(--display);font-size:36px;line-height:1.05;font-variant-numeric:tabular-nums}
+  .stat .v.g{color:var(--gold-ink)}
+  .stat .d{font-size:12px;color:var(--ink2)}
+  .flag{border:1px solid var(--gold);background:color-mix(in srgb,var(--gold) 10%,transparent);padding:12px 14px;margin-bottom:18px;display:grid;gap:4px}
+  .flag.ok{border-color:var(--turf);background:color-mix(in srgb,var(--turf) 10%,transparent)}
+  .flag.info{border-color:var(--line);background:var(--panel2)}
+  .flag .row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:1px 7px;white-space:nowrap}
+  .tag.start{background:var(--gold);color:var(--on-gold)}
+  .tag.sit{background:var(--bad);color:#fff}
+  .gain{font-family:var(--display);font-size:26px;line-height:1;color:var(--gold-ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr}}
+  .grid2>*{min-width:0}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink2);padding:12px 16px 0}
+  .sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+  svg.chart{display:block;width:100%;max-width:560px;height:auto;margin:6px auto 4px}
+  svg.chart text{font-family:var(--body);fill:var(--ink2)}
+  svg.chart .val{font-weight:600;fill:var(--on-turf)}
+  svg.chart .leak{fill:var(--ink);font-weight:600}
+  svg.chart .grid{stroke:var(--line);stroke-width:1}
+  svg.chart g.b:hover path{filter:brightness(1.18)}
+
+  .plist{list-style:none;margin:0;padding:6px 16px 12px;display:grid;gap:2px}
+  .prow{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:3px 10px;align-items:baseline;padding:7px 8px;margin-inline:-8px}
+  .prow .pn{min-width:0;overflow-wrap:anywhere}
+  .prow .pp{font-style:normal;color:var(--ink3);font-size:12px;margin-left:4px}
+  .prow .bar{grid-column:2 / 4;height:8px;background:var(--panel2)}
+  .prow .bar i{display:block;height:8px;background:var(--turf);border-radius:0 4px 4px 0}
+  .prow.bn .bar i{background:var(--neutral)}
+  .prow.in .bar i{background:var(--gold)}
+  .prow.out{background:color-mix(in srgb,var(--bad) 10%,transparent)}
+  .prow.in{background:color-mix(in srgb,var(--gold) 13%,transparent)}
+  .pv{font-family:var(--display);font-size:23px;line-height:1;font-variant-numeric:tabular-nums}
+  .pv.neg{color:var(--bad)}
+  .slot{font-size:10px;font-weight:600;letter-spacing:.04em;padding:2px 0;border:1px solid var(--line);background:var(--panel2);color:var(--ink2);text-align:center}
+  .badge{font-size:10.5px;font-weight:600;letter-spacing:.04em;margin-left:8px;white-space:nowrap}
+  .badge.in{color:var(--gold-ink)} .badge.out{color:var(--bad)}
+
+  .srow{display:grid;grid-template-columns:62px minmax(0,1fr) 62px;align-items:center;gap:10px;padding:5px 0;font-size:13px}
+  .srow .track{height:10px;background:var(--panel2)}
+  .srow .fill{display:block;height:10px;background:var(--turf);border-radius:0 5px 5px 0}
+  .srow.weak .fill{background:var(--gold)}
+  .srow .num{text-align:right;font-variant-numeric:tabular-nums}
+  .lowest{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);font-weight:600}
+
+  ul.tight{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+  ul.tight li{max-width:68ch;padding-left:18px;position:relative}
+  ul.tight li::before{content:"";position:absolute;left:0;top:.55em;width:8px;height:8px;background:var(--m,var(--gold))}
+  .moves ul.tight li::before{background:var(--turf)}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="top-in">
+    <div>
+      <div class="eyebrow">Four teams, one view</div>
+      <h1>Fantasy Control Room</h1>
+      <p class="sub">Starter points, best possible lineups and the weak spots that keep coming back. Scores are copied from each platform's own weekly roster view, so they use each league's real scoring.</p>
+    </div>
+    <div class="score" id="score"></div>
+  </div>
+  <div class="ruler" aria-label="Season progress">
+    <div class="ticks" id="ticks"></div>
+    <div class="cap"><span>Week 1</span><span id="capmid">Through Week 6 of 18</span><span>Week 18</span></div>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Dashboard sections">
+  <button role="tab" id="tab-main" aria-selected="true" aria-controls="view-main" class="tabbtn">Control Room</button>
+  <button role="tab" id="tab-legs" aria-selected="false" aria-controls="view-legs" class="tabbtn">PARLAY PAL</button>
+</nav>
+<div id="view-main" role="tabpanel" aria-labelledby="tab-main">
+<section class="cards" id="cards" aria-label="Teams"></section>
+
+<section class="panel" aria-labelledby="matrixh">
+  <div class="hd"><h2 id="matrixh">Points left on the bench</h2><span class="meta">Best possible lineup minus the lineup you set</span></div>
+  <div class="scroll"><table id="matrix"></table></div>
+  <div class="pad note">Best possible lineup uses everyone on your active roster that week, so it is a hindsight ceiling, not a realistic target. Taxi and IR players are left out. * means that week was not final when pulled. Correction: the first version of this page had wrong Week 1 starter totals for DPhi Dynasty (137.94, now 117.32), Melillo Dynasty (109.66, now 110.26) and the Eddie Pineiro team (110.26, now 109.86 before Kelce). Every total here is now added up by the page from the individual scores.</div>
+</section>
+
+<div id="detail"></div>
+
+
+
+<section class="panel moves" id="moves" aria-labelledby="movesh">
+  <div class="hd"><h2 id="movesh">Roster moves seen this season</h2><span class="meta">From each Sleeper league\u2019s transaction log</span></div>
+  <div class="pad"><ul class="tight" id="movelist"></ul></div>
+</section>
+
+<section class="panel" aria-labelledby="advh">
+  <div class="hd"><h2 id="advh">Advanced stats</h2><span class="meta">Not on this page yet</span></div>
+  <div class="pad">
+    <p style="margin:0;max-width:70ch">Yards per route run, yards after contact, target share and targets per game are not shown on Sleeper or ESPN roster screens, and I did not have a source I could read them from, so none are listed here and no numbers are estimated. Yards per carry and receptions per game can be worked out from the stat lines already in each weekly view once you want them added.</p>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="srch">
+  <div class="hd"><h2 id="srch">Sources</h2></div>
+  <div class="pad">
+    <ul class="tight" style="--m:var(--ink3)">
+      <li>Scores, rosters and roster moves: the public <a href="https://docs.sleeper.com/">Sleeper API</a> for your three Sleeper leagues. Updated Oct 21, 2026 at 06:56 PM ET.</li>
+      <li>NFL game stats: <a href="https://github.com/nflverse/nflverse-data">nflverse</a>. NFL schedule and college football box scores: ESPN's public scoreboard data.</li>
+      <li>The Eddie Pineiro (ESPN) team is entered by hand and is not part of the weekly refresh.</li>
+    </ul>
+  </div>
+</section>
+</div>
+<div id="view-legs" role="tabpanel" aria-labelledby="tab-legs" hidden>
+<div class="pad legintro"><h2 class="legh">PARLAY PAL</h2><p class="sub">Milestones players clear almost every week, across the NFL and Power 5 college football. NFL players on your teams are tagged.</p></div>
+<section class="panel" aria-labelledby="propsh">
+  <div class="hd"><h2 id="propsh">Every player, Weeks 1 to 5</h2><span class="meta" id="legcount"></span></div>
+  <div class="pad">
+    <div id="suggest" class="best"></div>
+    <div id="bestbets" class="best"></div>
+    <div class="pills" id="sportbar" role="group" aria-label="Sport"></div>
+    <div class="pills" id="legfilters" role="group" aria-label="Filter players"></div>
+    <div id="leglist"></div>
+    <p class="note" id="legnote" style="margin:12px 0 0">Covers every QB, RB, WR and TE in the NFL with at least 4 games played, using nflverse game stats. A milestone shows only if the player cleared it in 80% or more of his games, and each row shows the highest one that qualifies. These are stat milestones, not sportsbook lines, which I could not pull, so check the real number before you bet. Four or five games is a small sample.</p>
+  </div>
+</section>
+</div>
+</div>
+
+<script>
+// Fantasy dashboard data + lineup math. Scores come straight from each platform's weekly roster view.
+const SLOT_ELIG = {
+  QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'],
+  WRT: ['RB', 'WR', 'TE'], WRTQ: ['QB', 'RB', 'WR', 'TE'],
+  K: ['K'], DEF: ['DEF']
+};
+
+const TEAMS = [{"id":"eddie","name":"Eddie Pineiro","platform":"ESPN","type":"Redraft","weeks":{"1":{"partial":true,"note":"Kelce (Mon 8:15p) had no score yet in the screenshot, and your bench was cut off, so this week has no bench-leak read.","s":[["QB","J. Burrow","QB",14.16],["RB","C. Brown","RB",18.8],["RB","C. Skattebo","RB",14.1],["WR","C. Lamb","WR",15.4],["WR","G. Wilson","WR",13.9],["TE","T. Kelce","TE",null],["WRT","L. Burden III","WR",9.5],["DEF","Seahawks D/ST","DEF",14],["K","E. Pineiro","K",10]],"b":null}}},{"id":"redraft","name":"Melillo Redraft","platform":"Sleeper","type":"Redraft","weeks":{"1":{"s":[["QB","J. Herbert","QB",14.35],["RB","A. Jeanty","RB",32.7],["RB","J. Williams","RB",24.2],["WR","J. Jefferson","WR",31.2],["WR","L. McConkey","WR",19.2],["TE","I. Likely","TE",27.8],["WRT","D. Swift","RB",32.4],["WRT","B. Thomas Jr.","WR",7.0],["K","T. Bass","K",12.0],["DEF","JAX D/ST","DEF",12.0]],"b":[["C. Rodriguez Jr.","RB",2.3],["K. Monangai","RB",29.4],["N. Singleton","RB",0.0],["M. Washington Jr.","RB",4.1],["K. Sadiq","TE",11.4],["P. Mahomes","QB",25.5]]},"2":{"s":[["QB","P. Mahomes","QB",36.8],["RB","A. Jeanty","RB",10.3],["RB","J. Williams","RB",8.0],["WR","J. Jefferson","WR",8.5],["WR","L. McConkey","WR",6.5],["TE","I. Likely","TE",8.3],["WRT","D. Swift","RB",12.9],["WRT","B. Thomas Jr.","WR",7.0],["K","T. Bass","K",4.0],["DEF","JAX D/ST","DEF",4.0]],"b":[["C. Rodriguez Jr.","RB",1.3],["K. Monangai","RB",7.8],["N. Singleton","RB",1.0],["M. Washington Jr.","RB",0.7],["K. Sadiq","TE",3.7],["J. Herbert","QB",8.8]]},"3":{"s":[["QB","P. Mahomes","QB",22.4],["RB","A. Jeanty","RB",12.3],["RB","J. Williams","RB",18.3],["WR","J. Jefferson","WR",5.2],["WR","L. McConkey","WR",10.6],["TE","I. Likely","TE",3.3],["WRT","D. Swift","RB",10.8],["WRT","K. Monangai","RB",3.1],["K","T. Bass","K",6.0],["DEF","JAX D/ST","DEF",14.0]],"b":[["C. Rodriguez Jr.","RB",9.7],["B. Thomas Jr.","WR",1.8],["N. Singleton","RB",0.0],["M. Washington Jr.","RB",11.4],["K. Sadiq","TE",23.5],["J. Herbert","QB",15.0]]},"4":{"s":[["QB","P. Mahomes","QB",21.25],["RB","A. Jeanty","RB",18.6],["RB","J. Williams","RB",31.3],["WR","Q. Johnston","WR",5.0],["WR","L. McConkey","WR",0.0],["TE","I. Likely","TE",13.6],["WRT","D. Swift","RB",7.4],["WRT","K. Sadiq","TE",0.0],["K","T. Bass","K",8.0],["DEF","JAX D/ST","DEF",8.0]],"b":[["C. Rodriguez Jr.","RB",9.5],["B. Thomas Jr.","WR",9.7],["K. Monangai","RB",28.0],["M. Washington Jr.","RB",2.7],["J. Jefferson","WR",0.0],["J. Herbert","QB",9.45]]},"5":{"s":[["QB","D. Watson","QB",7.75],["RB","A. Jeanty","RB",10.7],["RB","J. Williams","RB",14.2],["WR","J. Jefferson","WR",18.8],["WR","K. Bourne","WR",12.0],["TE","I. Likely","TE",32.4],["WRT","D. Swift","RB",17.3],["WRT","K. Sadiq","TE",0.3],["K","T. Bass","K",10.0],["DEF","JAX D/ST","DEF",3.0]],"b":[["B. Thomas Jr.","WR",0.0],["L. McConkey","WR",0.0],["K. Monangai","RB",0.0],["D. Cooper","WR",24.1],["M. Washington Jr.","RB",2.0],["P. Mahomes","QB",0.0],["J. Herbert","QB",8.45]]},"6":{"s":[["QB","P. Mahomes","QB",13.2],["RB","A. Jeanty","RB",15.8],["RB","J. Williams","RB",13.0],["WR","K. Bourne","WR",9.7],["WR","L. McConkey","WR",2.7],["TE","I. Likely","TE",23.9],["WRT","D. Swift","RB",23.0],["WRT","D. Cooper","WR",1.9],["K","T. Bass","K",15.0],["DEF","JAX D/ST","DEF",2.0]],"b":[["M. Washington Jr.","RB",6.0],["K. Sadiq","TE",2.2],["D. Watson","QB",6.1],["J. Jefferson","WR",0.0],["J. Herbert","QB",6.8],["T. Higgins","WR",0.0]]}}},{"id":"mdyn","name":"Melillo Dynasty","platform":"Sleeper","type":"Dynasty PPR","weeks":{"1":{"s":[["QB","J. Herbert","QB",13.26],["RB","J. Williams","RB",24.2],["RB","B. Hall","RB",19.8],["WR","G. Pickens","WR",5.8],["WR","K. Concepcion Jr.","WR",7.8],["TE","T. Warren","TE",10.3],["WRT","J. Love","RB",13.0],["WRT","C. Skattebo","RB",14.1],["K","C. Dicker","K",2.0],["DEF","LAC D/ST","DEF",0.0]],"b":[["E. Demercado","RB",0.7],["E. Wilson","RB",0.3],["M. Penix Jr.","QB",0.0],["A. Estime","RB",0.0],["C. Stover","TE",0.8],["J. James","RB",0.0],["E. Ayomanor","WR",8.1],["C. Ward","QB",11.7],["J. Horn Jr.","WR",-2.0],["S. Sanders","QB",0.0],["C. Beck","QB",0.0],["M. Lemon","WR",2.5],["O. Beckham Jr.","WR",0.0],["T. Bigsby","RB",0.3],["M. Mayer","TE",9.2]]},"2":{"s":[["QB","J. Herbert","QB",7.88],["RB","J. Williams","RB",8.0],["RB","B. Hall","RB",14.2],["WR","G. Pickens","WR",10.0],["WR","K. Concepcion Jr.","WR",8.2],["TE","T. Warren","TE",14.4],["WRT","J. Love","RB",7.5],["WRT","C. Skattebo","RB",9.5],["K","C. Dicker","K",1.0],["DEF","LAC D/ST","DEF",5.0]],"b":[["E. Demercado","RB",0.8],["E. Wilson","RB",9.2],["M. Penix Jr.","QB",0.0],["A. Estime","RB",0.0],["C. Stover","TE",0.0],["J. James","RB",1.5],["E. Ayomanor","WR",8.9],["C. Ward","QB",20.02],["J. Horn Jr.","WR",0.0],["S. Sanders","QB",0.0],["C. Beck","QB",0.0],["M. Lemon","WR",1.9],["O. Beckham Jr.","WR",0.0],["T. Bigsby","RB",11.8],["M. Mayer","TE",5.3]]},"3":{"s":[["QB","J. Herbert","QB",12.74],["RB","J. Williams","RB",18.3],["RB","B. Hall","RB",8.5],["WR","G. Pickens","WR",15.2],["WR","G. Wilson","WR",26.7],["TE","T. Warren","TE",14.7],["WRT","J. Love","RB",21.9],["WRT","C. Skattebo","RB",13.0],["K","C. Dicker","K",9.0],["DEF","CAR D/ST","DEF",6.0]],"b":[["E. Demercado","RB",0.0],["E. Wilson","RB",1.4],["M. Penix Jr.","QB",14.04],["A. Estime","RB",0.0],["J. James","RB",0.0],["E. Ayomanor","WR",2.1],["C. Ward","QB",9.44],["J. Horn Jr.","WR",0.0],["S. Sanders","QB",0.0],["C. Beck","QB",0.0],["M. Lemon","WR",5.9],["K. Concepcion Jr.","WR",2.9],["O. Beckham Jr.","WR",0.0],["T. Bigsby","RB",-0.5],["M. Mayer","TE",12.2]]},"4":{"s":[["QB","M. Penix Jr.","QB",12.72],["RB","J. Williams","RB",31.3],["RB","J. Love","RB",6.5],["WR","G. Pickens","WR",9.5],["WR","G. Wilson","WR",5.7],["TE","T. Warren","TE",9.1],["WRT","B. Allen","RB",8.7],["WRT","C. Skattebo","RB",7.6],["K","C. Dicker","K",12.0],["DEF","CAR D/ST","DEF",-4.0]],"b":[["E. Demercado","RB",0.0],["E. Wilson","RB",27.0],["A. Estime","RB",0.0],["J. James","RB",0.0],["E. Ayomanor","WR",3.2],["C. Ward","QB",15.58],["J. Horn Jr.","WR",0.0],["S. Sanders","QB",0.0],["C. Beck","QB",0.0],["M. Lemon","WR",5.7],["K. Concepcion Jr.","WR",11.4],["J. Herbert","QB",9.56],["B. Hall","RB",0.0],["T. Bigsby","RB",5.5],["M. Mayer","TE",16.2]]},"5":{"s":[["QB","M. Penix Jr.","QB",14.4],["RB","J. Williams","RB",14.2],["RB","J. Love","RB",2.2],["WR","G. Pickens","WR",28.0],["WR","G. Wilson","WR",23.4],["TE","T. Warren","TE",21.4],["WRT","E. Wilson","RB",13.2],["WRT","B. Allen","RB",18.6],["K","C. Dicker","K",6.0],["DEF","CIN D/ST","DEF",10.0]],"b":[["E. Demercado","RB",0.0],["J. James","RB",0.0],["C. Skattebo","RB",7.1],["E. Ayomanor","WR",2.7],["C. Ward","QB",5.0],["J. Horn Jr.","WR",0.0],["S. Sanders","QB",0.0],["D. Cooper","WR",15.1],["C. Beck","QB",0.0],["M. Lemon","WR",9.3],["K. Concepcion Jr.","WR",1.5],["J. Herbert","QB",10.24],["B. Hall","RB",0.0],["T. Bigsby","RB",0.0],["M. Mayer","TE",1.2]]},"6":{"s":[["QB","M. Penix Jr.","QB",23.1],["RB","J. Williams","RB",13.0],["RB","B. Allen","RB",12.4],["WR","G. Pickens","WR",13.3],["WR","G. Wilson","WR",8.4],["TE","M. Mayer","TE",16.5],["WRT","E. Wilson","RB",5.2],["WRT","C. Skattebo","RB",0.0],["K","C. Dicker","K",6.0],["DEF","IND D/ST","DEF",5.0]],"b":[["J. James","RB",0.0],["E. Ayomanor","WR",1.3],["T. Warren","TE",0.0],["C. Ward","QB",6.78],["J. Horn Jr.","WR",0.0],["S. Sanders","QB",0.0],["D. Cooper","WR",1.9],["C. Beck","QB",0.0],["J. Love","RB",0.0],["M. Lemon","WR",4.9],["K. Concepcion Jr.","WR",7.9],["J. Herbert","QB",8.76],["B. Hall","RB",0.0],["T. Bigsby","RB",0.0]]}}},{"id":"dphi","name":"DPhi Dynasty","platform":"Sleeper","type":"Dynasty SF PPR","weeks":{"1":{"s":[["QB","D. Prescott","QB",14.4],["RB","T. Etienne Jr.","RB",14.8],["RB","Q. Judkins","RB",7.0],["WR","J. Smith-Njigba","WR",26.2],["WR","D. London","WR",5.5],["TE","M. Mayer","TE",9.2],["WRT","Z. Flowers","WR",26.0],["WRT","C. Otton","TE",5.6],["WRTQ","K. Murray","QB",-0.38],["K","C. Dicker","K",2.0],["DEF","BAL D/ST","DEF",7.0]],"b":[["B. Bowers","TE",0.0],["J. McMillan","WR",0.0],["E. Arroyo","TE",0.0],["C. Beck","QB",0.0],["O. Cooper Jr.","WR",4.0],["M. Klare","TE",0.0],["N. Singleton","RB",0.0],["K. Sadiq","TE",11.4],["B. Robinson Jr.","RB",3.1],["I. Pacheco","RB",0.0],["Z. Charbonnet","RB",0.0]]},"2":{"s":[["QB","D. Prescott","QB",29.76],["RB","T. Etienne Jr.","RB",7.1],["RB","Q. Judkins","RB",9.8],["WR","J. Smith-Njigba","WR",42.5],["WR","D. London","WR",8.9],["TE","M. Mayer","TE",5.3],["WRT","J. McMillan","WR",0.0],["WRT","K. Sadiq","TE",3.7],["WRTQ","C. Wentz","QB",6.32],["K","C. Dicker","K",1.0],["DEF","BAL D/ST","DEF",3.0]],"b":[["B. Bowers","TE",0.0],["C. Beck","QB",0.0],["O. Cooper Jr.","WR",0.0],["M. Klare","TE",0.0],["N. Singleton","RB",1.0],["K. Murray","QB",0.0],["C. Otton","TE",8.8],["B. Robinson Jr.","RB",8.7],["I. Pacheco","RB",0.0],["Z. Charbonnet","RB",0.0],["Z. Flowers","WR",0.0]]},"3":{"s":[["QB","D. Prescott","QB",18.94],["RB","T. Etienne Jr.","RB",9.0],["RB","Q. Judkins","RB",9.9],["WR","J. Smith-Njigba","WR",35.36],["WR","D. London","WR",28.4],["TE","B. Bowers","TE",27.6],["WRT","Z. Flowers","WR",15.4],["WRT","K. Sadiq","TE",23.5],["WRTQ","K. Murray","QB",10.42],["K","C. Dicker","K",9.0],["DEF","BAL D/ST","DEF",6.0]],"b":[["J. McMillan","WR",0.0],["G. Helm","TE",3.4],["C. Beck","QB",0.0],["O. Cooper Jr.","WR",0.0],["M. Klare","TE",0.0],["N. Singleton","RB",0.0],["C. Wentz","QB",0.0],["D. Lock","QB",0.0],["C. Otton","TE",8.6],["B. Robinson Jr.","RB",11.0],["I. Pacheco","RB",0.0],["M. Mayer","TE",12.2],["Z. Charbonnet","RB",0.0]]},"4":{"s":[["QB","D. Prescott","QB",18.1],["RB","B. Robinson Jr.","RB",25.7],["RB","Q. Judkins","RB",21.6],["WR","J. Smith-Njigba","WR",12.6],["WR","D. London","WR",14.6],["TE","B. Bowers","TE",20.6],["WRT","Z. Flowers","WR",25.8],["WRT","K. Sadiq","TE",0.0],["WRTQ","K. Murray","QB",11.48],["K","C. Dicker","K",12.0],["DEF","BAL D/ST","DEF",7.0]],"b":[["J. McMillan","WR",0.0],["G. Helm","TE",3.5],["C. Beck","QB",0.0],["O. Cooper Jr.","WR",0.0],["M. Klare","TE",0.0],["N. Singleton","RB",0.2],["C. Wentz","QB",0.0],["D. Lock","QB",0.0],["T. Etienne Jr.","RB",0.0],["C. Otton","TE",7.7],["I. Pacheco","RB",0.0],["M. Mayer","TE",16.2],["Z. Charbonnet","RB",0.0]]},"5":{"s":[["QB","D. Prescott","QB",12.64],["RB","B. Robinson Jr.","RB",1.6],["RB","Q. Judkins","RB",8.0],["WR","J. Smith-Njigba","WR",22.8],["WR","D. London","WR",18.8],["TE","B. Bowers","TE",23.0],["WRT","Z. Flowers","WR",14.6],["WRT","K. Sadiq","TE",0.3],["WRTQ","K. Murray","QB",18.26],["K","C. Dicker","K",6.0],["DEF","BAL D/ST","DEF",7.0]],"b":[["J. McMillan","WR",0.0],["D. Cooper","WR",15.1],["C. Beck","QB",0.0],["O. Cooper Jr.","WR",0.0],["M. Klare","TE",0.0],["N. Singleton","RB",0.0],["C. Wentz","QB",0.0],["D. Lock","QB",0.0],["T. Etienne Jr.","RB",0.0],["C. Otton","TE",5.5],["I. Pacheco","RB",0.0],["M. Mayer","TE",1.2],["Z. Charbonnet","RB",0.0]]},"6":{"s":[["QB","D. Prescott","QB",11.02],["RB","B. Robinson Jr.","RB",3.0],["RB","J. McLaughlin","RB",9.5],["WR","J. Smith-Njigba","WR",25.4],["WR","D. London","WR",12.2],["TE","B. Bowers","TE",11.0],["WRT","Z. Flowers","WR",12.7],["WRT","K. Sadiq","TE",2.2],["WRTQ","D. Cooper","WR",1.9],["K","C. Dicker","K",6.0],["DEF","BAL D/ST","DEF",9.0]],"b":[["J. Bates","K",0.0],["J. McMillan","WR",0.0],["Q. Judkins","RB",0.0],["C. Beck","QB",0.0],["O. Cooper Jr.","WR",22.3],["M. Klare","TE",0.0],["N. Singleton","RB",0.0],["K. Murray","QB",0.0],["D. Lock","QB",0.0],["T. Etienne Jr.","RB",0.0],["C. Otton","TE",1.4],["I. Pacheco","RB",0.0],["M. Mayer","TE",16.5],["Z. Charbonnet","RB",0.0]]}}}];
+
+// Best possible lineup from starters + bench (fill the most restrictive slots first).
+function optimal(week) {
+  if (!week.b) return null;
+  const pool = [];
+  week.s.forEach(x => pool.push({ name: x[1], pos: x[2], pts: x[3] || 0 }));
+  week.b.forEach(x => pool.push({ name: x[0], pos: x[1], pts: x[2] || 0 }));
+  const order = ['QB','RB','WR','TE','K','DEF','WRT','WRTQ'];
+  const slots = week.s.map(x => x[0]);
+  let total = 0;
+  const used = new Set();
+  const picks = [];
+  order.forEach(sl => {
+    slots.filter(s => s === sl).forEach(() => {
+      let best = null;
+      pool.forEach((p, i) => {
+        if (used.has(i) || !SLOT_ELIG[sl].includes(p.pos)) return;
+        if (!best || p.pts > best.p.pts) best = { p, i };
+      });
+      if (best) { used.add(best.i); total += best.p.pts; picks.push([sl, best.p.name, best.p.pts]); }
+    });
+  });
+  return { total: Math.round(total * 100) / 100, picks };
+}
+
+function startTotal(week) {
+  return Math.round(week.s.reduce((a, x) => a + (x[3] || 0), 0) * 100) / 100;
+}
+
+function weekSummary(team, w) {
+  const wk = team.weeks[w];
+  if (!wk) return null;
+  const start = startTotal(wk);
+  const opt = optimal(wk);
+  return { start, opt: opt ? opt.total : null, leak: opt ? Math.round((opt.total - start) * 100) / 100 : null, picks: opt ? opt.picks : null };
+}
+
+if (typeof module !== 'undefined') module.exports = { TEAMS, optimal, startTotal, weekSummary, SLOT_ELIG };
+
+</script>
+<script>
+const $ = s => document.querySelector(s);
+const f2 = n => n == null ? '—' : (Math.round(n * 100) / 100).toFixed(2);
+const f1 = n => (Math.round(n * 10) / 10).toFixed(1);
+const weeksOf = t => Object.keys(t.weeks).map(Number).sort((a, b) => a - b);
+const lastWeek = t => Math.max(...weeksOf(t));
+const slotLabel = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', WRT: 'FLEX', WRTQ: 'SFLEX', K: 'K', DEF: 'D/ST' };
+const ACCENT = { eddie: 'var(--a-eddie)', redraft: 'var(--a-redraft)', mdyn: 'var(--a-mdyn)', dphi: 'var(--a-dphi)' };
+const SEASON_WEEKS = 18, THROUGH = 6;
+
+let cur = { team: 'redraft', week: 5 };
+
+const INSIGHTS = {"eddie": {"weak": ["Only the weeks entered by hand are on file for this team. The ESPN league is not part of the automatic refresh."], "moves": ["Add screenshots or numbers to data/eddie.json, or ask Claude to update it, and this tab fills in like the others."]}, "redraft": {"weak": ["Total left on the bench over 6 weeks: 131.8 points, with 10 or more in 4 of them.", "Biggest miss: Week 4, 39.8 points.", "The lowest-scoring starting slot is a flex slot, averaging 10.3 a week.", "Kicker averages 9.2 and D/ST averages 7.2 a week.", "K. Monangai would have been in the best possible lineup in 3 of 6 weeks.", "M. Washington Jr. would have been in the best possible lineup in 2 of 6 weeks."], "moves": ["Look at starting K. Monangai, M. Washington Jr. more often, or trade depth for help at the slot they keep beating.", "These ideas come only from your own scoring history. Check who is on waivers and current trade values in your league before acting."]}, "mdyn": {"weak": ["Total left on the bench over 6 weeks: 84.1 points, with 10 or more in 3 of them.", "Biggest miss: Week 4, 37.7 points.", "The lowest-scoring starting slot is a flex slot, averaging 11.0 a week.", "Kicker averages 6.0 and D/ST averages 3.7 a week.", "E. Ayomanor would have been in the best possible lineup in 2 of 6 weeks.", "C. Ward would have been in the best possible lineup in 2 of 6 weeks.", "E. Wilson would have been in the best possible lineup in 2 of 6 weeks."], "moves": ["Look at starting E. Ayomanor, C. Ward, E. Wilson more often, or trade depth for help at the slot they keep beating.", "You carry 5 QBs and only 1 slot(s) can start one. Packaging a spare for a position of need could help.", "Stream the kicker and D/ST by matchup each week. They are the cheapest points to improve.", "These ideas come only from your own scoring history. Check who is on waivers and current trade values in your league before acting."]}, "dphi": {"weak": ["Total left on the bench over 6 weeks: 95.1 points, with 10 or more in 5 of them.", "Biggest miss: Week 6, 34.7 points.", "The lowest-scoring starting slot is the superflex slot, averaging 8.0 a week.", "Kicker averages 6.0 and D/ST averages 6.5 a week.", "M. Mayer would have been in the best possible lineup in 3 of 6 weeks.", "B. Robinson Jr. would have been in the best possible lineup in 2 of 6 weeks."], "moves": ["Look at starting M. Mayer, B. Robinson Jr. more often, or trade depth for help at the slot they keep beating.", "You carry 5 TEs and only 1 slot(s) can start one. Packaging a spare for a position of need could help.", "Stream the kicker and D/ST by matchup each week. They are the cheapest points to improve.", "These ideas come only from your own scoring history. Check who is on waivers and current trade values in your league before acting."]}};
+const MOVES = [["<b>Melillo Redraft</b> (1-5)<br>Aug 23: Free agent: added M. Washington Jr.; dropped J. Tyson<br>Oct 2: Free agent: added Q. Johnston; dropped N. Singleton<br>Oct 4: Waiver: added D. Cooper; dropped C. Rodriguez Jr.<br>Oct 8: Free agent: added D. Watson; dropped Q. Johnston<br>Oct 9: <b>Trade</b> with MelantSr13: sent K. Monangai, received T. Higgins<br>Oct 11: Free agent: added K. Bourne; dropped B. Thomas Jr.<br>Oct 21: Free agent: added E. McPherson; dropped T. Bass<br>Oct 21: Free agent: added CLE D/ST; dropped JAX D/ST"], ["<b>Melillo Dynasty</b> (4-2)<br>Feb 3: <b>Trade</b> with MikeMelillo: sent B. Irving, K. Coleman, received J. Addison, 2026 1st-round pick<br>Feb 15: <b>Trade</b> with prucci18: sent T. Hunter, 2026 1st-round pick, received C. Olave, 2027 2nd-round pick<br>May 5: <b>Trade</b> with JakeTobia27: sent 2026 2nd-round pick, 2026 1st-round pick, received 2026 1st-round pick<br>May 14: Free agent: dropped T. Lockett<br>May 14: Waiver: added E. Heidenreich<br>May 14: Waiver: added C. Beck ($2)<br>May 14: Waiver: added D. Claiborne<br>May 16: Waiver: added T. Bigsby<br>May 26: Waiver: added LAC D/ST<br>May 31: Waiver: added J. James; dropped M. Carter<br>Jun 1: Waiver: added O. Beckham Jr.; dropped L. Musgrave<br>Jun 2: <b>Trade</b> with cjrome24: sent C. Olave, received C. Ward, 2027 1st-round pick<br>Jun 2: <b>Trade</b> with KMartorana2: sent J. Addison, received J. McMillan, 2028 2nd-round pick<br>Jul 25: <b>Trade</b> with KMartorana2: sent B. Bowers, J. McMillan, received C. Skattebo, G. Pickens, 2027 3rd-round pick<br>Jul 29: <b>Trade</b> with JakeTobia27: sent T. Franklin, G. Helm, J. Downs, 2028 1st-round pick, 2027 1st-round pick, received T. Warren, J. Williams, 2027 2nd-round pick<br>Sep 9: Free agent: dropped WAS D/ST<br>Sep 9: Free agent: dropped J. Blue<br>Sep 22: <b>Trade</b> with MikeMelillo: sent 2027 1st-round pick, received G. Wilson<br>Sep 23: Free agent: dropped C. Stover<br>Sep 23: Waiver: added CAR D/ST; dropped LAC D/ST<br>Sep 29: <b>Trade</b> with bkurland: sent 2027 3rd-round pick, received B. Allen<br>Sep 30: Free agent: dropped O. Beckham Jr.<br>Oct 4: Waiver: added D. Cooper; dropped A. Estime ($4)<br>Oct 7: Waiver: added CIN D/ST; dropped CAR D/ST<br>Oct 11: Free agent: dropped E. Demercado<br>Oct 13: Waiver: added IND D/ST; dropped CIN D/ST<br>Oct 19: <b>Trade</b> with KMartorana2: sent C. Skattebo, 2027 2nd-round pick, received J. Warren<br>Oct 20: Waiver: added M. Gay; dropped C. Dicker<br>Oct 20: Waiver: added NYJ D/ST; dropped IND D/ST"], ["<b>DPhi Dynasty</b> (2-4)<br>Sep 13: Free agent: dropped E. Arroyo<br>Sep 13: Waiver: added C. Wentz<br>Sep 21: Waiver: added D. Lock<br>Sep 25: Waiver: added G. Helm<br>Oct 4: Waiver: added D. Cooper; dropped G. Helm<br>Oct 18: Free agent: added J. McLaughlin; dropped C. Wentz<br>Oct 20: Waiver: added J. Bates; dropped C. Dicker"], ["<b>Eddie Pineiro (ESPN)</b>: entered by hand, nothing on file beyond what is in data/eddie.json."]];
+
+
+function swaps(wk) {
+  const o = optimal(wk);
+  if (!o) return null;
+  const startNames = wk.s.map(x => x[1]);
+  const pickNames = o.picks.map(p => p[1]);
+  return {
+    o,
+    ins: o.picks.filter(p => !startNames.includes(p[1])),
+    outs: wk.s.filter(x => !pickNames.includes(x[1]))
+  };
+}
+
+function aggregate() {
+  let leak = 0, n = 0, big = { leak: -1, team: '', w: '' };
+  TEAMS.forEach(t => weeksOf(t).forEach(w => {
+    const s = weekSummary(t, w);
+    if (s.leak != null) {
+      leak += s.leak; n++;
+      if (s.leak > big.leak) big = { leak: s.leak, team: t.name, w };
+    }
+  }));
+  return { leak, n, big };
+}
+
+function renderHeader() {
+  const a = aggregate();
+  $('#score').innerHTML =
+    '<div><div class="n g">' + f1(a.leak) + '</div><div class="l">points left on benches across ' + a.n + ' team-weeks</div></div>' +
+    '<div><div class="n">' + f1(a.big.leak) + '</div><div class="l">biggest single miss: ' + a.big.team + ', Week ' + a.big.w + '</div></div>';
+  let t = '';
+  for (let i = 1; i <= SEASON_WEEKS; i++) t += '<i class="' + (i < THROUGH ? 'done' : i === THROUGH ? 'now' : '') + '"></i>';
+  $('#ticks').innerHTML = t;
+}
+
+function spark(team) {
+  const ws = weeksOf(team);
+  const vals = ws.map(w => startTotal(team.weeks[w]));
+  if (vals.length < 2) return '<div class="spark-empty">Only Week 1 on file</div>';
+  const W = 220, H = 58, px = 8, py = 8;
+  const hi = Math.max(...vals) * 1.08;
+  const x = i => px + (W - 2 * px) * i / (vals.length - 1);
+  const y = v => H - py - (H - 2 * py) * v / hi;
+  const pts = vals.map((v, i) => [x(i), y(v)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = line + ' L' + pts[pts.length - 1][0].toFixed(1) + ' ' + (H - py) + ' L' + pts[0][0].toFixed(1) + ' ' + (H - py) + ' Z';
+  const last = pts[pts.length - 1];
+  return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Starter points by week: ' + vals.map(f1).join(', ') + '">' +
+    '<line x1="' + px + '" x2="' + (W - px) + '" y1="' + (H - py) + '" y2="' + (H - py) + '" stroke="var(--line)" stroke-width="1"/>' +
+    '<path d="' + area + '" fill="var(--a)" fill-opacity=".16"/>' +
+    '<path d="' + line + '" fill="none" stroke="var(--a)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="4.5" fill="var(--a)" stroke="var(--panel)" stroke-width="2"/></svg>';
+}
+
+function renderCards() {
+  $('#cards').innerHTML = TEAMS.map(t => {
+    const ws = weeksOf(t);
+    const totals = ws.map(w => startTotal(t.weeks[w]));
+    const sum = totals.reduce((a, b) => a + b, 0);
+    let leak = 0, has = false;
+    ws.forEach(w => { const s = weekSummary(t, w); if (s.leak != null) { leak += s.leak; has = true; } });
+    const best = Math.max(...totals), bw = ws[totals.indexOf(best)];
+    return '<button class="tcard" style="--a:' + ACCENT[t.id] + '" data-team="' + t.id + '" aria-pressed="' + (t.id === cur.team) + '">' +
+      '<span><span class="tc-name">' + t.name + '</span><span class="tc-sub">' + t.platform + ' · ' + t.type + '</span></span>' +
+      '<span class="tc-big">' + f1(sum / ws.length) + '<small>avg per week</small></span>' +
+      spark(t) +
+      '<span class="tc-foot"><span>Left on bench <b class="g">' + (has ? f1(leak) : '—') + '</b></span><span>Best <b>W' + bw + '</b> ' + f1(best) + '</span></span></button>';
+  }).join('');
+  document.querySelectorAll('.tcard').forEach(b => b.onclick = () => {
+    cur.team = b.dataset.team;
+    cur.week = lastWeek(TEAMS.find(t => t.id === cur.team));
+    render();
+    try { $('#detail').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); } catch (e) {}
+  });
+}
+
+function renderMatrix() {
+  let h = '<thead><tr><th>Team</th>';
+  for (let w = 1; w <= 6; w++) h += '<th class="n">Wk ' + w + '</th>';
+  h += '<th class="n">Total</th><th class="n">Weeks over 10</th></tr></thead><tbody>';
+  TEAMS.forEach(t => {
+    let total = 0, over = 0, counted = 0;
+    h += '<tr><td><b>' + t.name + '</b><div class="muted" style="font-size:11.5px">' + t.platform + ' · ' + t.type + '</div></td>';
+    for (let w = 1; w <= 6; w++) {
+      const s = weekSummary(t, w);
+      if (!s || s.leak == null) { h += '<td class="c muted">—</td>'; continue; }
+      total += s.leak; counted++;
+      if (s.leak >= 10) over++;
+      const pct = Math.min(62, Math.round(s.leak * 1.7));
+      h += '<td class="c" style="background:color-mix(in srgb,var(--gold) ' + pct + '%,transparent)">' + f1(s.leak) + (t.weeks[w].partial ? '*' : '') + '</td>';
+    }
+    h += '<td class="c"><b>' + (counted ? f1(total) : '—') + '</b></td><td class="c">' + (counted ? over + ' of ' + counted : '—') + '</td></tr>';
+  });
+  $('#matrix').innerHTML = h + '</tbody>';
+}
+
+function topRound(x, y, w, h, r, fill) {
+  if (h <= 0) return '';
+  r = Math.min(r, w / 2, h);
+  return '<path d="M' + x + ' ' + (y + h) + 'V' + (y + r) + 'a' + r + ' ' + r + ' 0 0 1 ' + r + ' -' + r + 'H' + (x + w - r) + 'a' + r + ' ' + r + ' 0 0 1 ' + r + ' ' + r + 'V' + (y + h) + 'Z" fill="' + fill + '"/>';
+}
+
+function chartSVG(team) {
+  const ws = weeksOf(team);
+  const data = ws.map(w => weekSummary(team, w));
+  const maxV = Math.max(...data.map(d => d.start + (d.leak || 0)));
+  const top = Math.max(50, Math.ceil(maxV / 50) * 50);
+  const W = 400, H = 250, pl = 34, pr = 8, pt = 30, pb = 28;
+  const y = v => pt + (H - pt - pb) * (1 - v / top);
+  const step = (W - pl - pr) / ws.length;
+  const bw = Math.min(58, step * 0.64);
+  let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weekly starter points and points left on the bench for ' + team.name + '">';
+  for (let v = 0; v <= top; v += 50) {
+    s += '<line class="grid" x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
+    s += '<text x="' + (pl - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11">' + v + '</text>';
+  }
+  ws.forEach((w, i) => {
+    const d = data[i];
+    const cx = pl + step * i + step / 2, x = cx - bw / 2;
+    const tip = 'Week ' + w + ': ' + f1(d.start) + ' starters' + (d.leak != null ? ', ' + f1(d.leak) + ' left on bench' : '');
+    s += '<g class="b"><title>' + tip + '</title>';
+    const h0 = y(0) - y(d.start);
+    if (d.leak > 0) {
+      s += '<rect x="' + x + '" y="' + y(d.start) + '" width="' + bw + '" height="' + h0 + '" fill="var(--turf)"/>';
+      s += topRound(x, y(d.start + d.leak), bw, Math.max(0, (y(d.start) - y(d.start + d.leak)) - 2), 4, 'var(--gold)');
+      s += '<text class="leak" x="' + cx + '" y="' + (y(d.start + d.leak) - 6) + '" text-anchor="middle" font-size="11">+' + f1(d.leak) + '</text>';
+    } else {
+      s += topRound(x, y(d.start), bw, h0, 4, 'var(--turf)');
+    }
+    s += '<text class="val" x="' + cx + '" y="' + (y(d.start) + 16) + '" text-anchor="middle" font-size="12">' + f1(d.start) + '</text>';
+    s += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="12">W' + w + (team.weeks[w].partial ? '*' : '') + '</text></g>';
+  });
+  return s + '</svg>';
+}
+
+function slotAverages(team) {
+  const acc = {};
+  weeksOf(team).forEach(w => {
+    const seen = {};
+    team.weeks[w].s.forEach(x => {
+      seen[x[0]] = (seen[x[0]] || 0) + 1;
+      (acc['' + x[0] + '#' + seen[x[0]]] = acc['' + x[0] + '#' + seen[x[0]]] || []).push(x[3]);
+    });
+  });
+  return Object.keys(acc).map(k => {
+    const vals = acc[k].filter(v => v != null);
+    const [slot, idx] = k.split('#');
+    const multi = Object.keys(acc).filter(q => q.startsWith(slot + '#')).length > 1;
+    return { label: slotLabel[slot] + (multi ? ' ' + idx : ''), avg: vals.reduce((a, b) => a + b, 0) / vals.length };
+  });
+}
+
+function prow(cls, slot, name, pos, pts, max, badge) {
+  const w = Math.max(0, Math.min(100, (pts || 0) / max * 100));
+  return '<li class="prow ' + cls + '"><span class="slot">' + slot + '</span>' +
+    '<span class="pn">' + name + '<i class="pp">' + pos + '</i>' + (badge || '') + '</span>' +
+    '<span class="pv' + (pts < 0 ? ' neg' : '') + '">' + (pts == null ? '—' : f2(pts)) + '</span>' +
+    '<span class="bar"><i style="width:' + w + '%"></i></span></li>';
+}
+
+function renderTeam() {
+  const team = TEAMS.find(t => t.id === cur.team);
+  const ws = weeksOf(team);
+  if (!team.weeks[cur.week]) cur.week = lastWeek(team);
+  const wk = team.weeks[cur.week];
+  const sum = weekSummary(team, cur.week);
+  const sw = swaps(wk);
+  let seasonLeak = 0, seasonStart = 0;
+  ws.forEach(w => { const q = weekSummary(team, w); seasonStart += q.start; if (q.leak != null) seasonLeak += q.leak; });
+
+  let h = '<div style="--a:' + ACCENT[team.id] + '">';
+  h += '<div class="dhead"><span class="dot"></span><div><h2>' + team.name + '</h2><div class="chips"><span class="chip">' + team.platform + '</span><span class="chip">' + team.type + '</span></div></div></div>';
+
+  h += '<div class="pills" role="group" aria-label="Week">';
+  for (let w = 1; w <= 6; w++) {
+    const has = !!team.weeks[w];
+    h += '<button class="pill" aria-pressed="' + (w === cur.week) + '" data-week="' + w + '"' + (has ? '' : ' disabled') + '>Wk ' + w + '</button>';
+  }
+  h += '</div>';
+
+  h += '<div class="stats">' +
+    '<div class="stat"><div class="k">Starters, Week ' + cur.week + '</div><div class="v">' + f1(sum.start) + '</div><div class="d">' + (wk.partial ? 'not final yet' : 'final') + '</div></div>' +
+    '<div class="stat"><div class="k">Best possible</div><div class="v">' + (sum.opt != null ? f1(sum.opt) : '—') + '</div><div class="d">' + (sum.opt != null ? 'from your active roster' : 'bench not captured') + '</div></div>' +
+    '<div class="stat"><div class="k">Left on bench</div><div class="v g">' + (sum.leak != null ? f1(sum.leak) : '—') + '</div><div class="d">this week</div></div>' +
+    '<div class="stat"><div class="k">Season so far</div><div class="v">' + f1(seasonStart) + '</div><div class="d">' + (seasonLeak ? f1(seasonLeak) + ' left on bench in ' + ws.length + ' weeks' : ws.length + ' week on file') + '</div></div></div>';
+
+  if (wk.note) h += '<div class="flag info"><div><b>Heads up:</b> ' + wk.note + '</div></div>';
+  if (sw && sw.ins.length) {
+    h += '<div class="flag"><div class="row"><span class="gain">+' + f1(sum.leak) + '</span><b>available in Week ' + cur.week + '</b></div>' +
+      '<div class="row"><span class="tag start">START</span>' + sw.ins.map(p => p[1] + ' (' + f1(p[2]) + ')').join(', ') + '</div>' +
+      '<div class="row"><span class="tag sit">SIT</span>' + sw.outs.map(x => x[1] + ' (' + f1(x[3] || 0) + ')').join(', ') + '</div></div>';
+  } else if (sw) {
+    h += '<div class="flag ok"><div><b>Lineup was already the best available.</b> Nothing on the bench would have beaten your starters.</div></div>';
+  }
+
+  h += '<div class="grid2"><section class="panel"><div class="hd"><h3>Weekly starters vs. best lineup</h3></div>' +
+    '<div class="legend"><span><i class="sw" style="background:var(--turf)"></i>Starter points</span><span><i class="sw" style="background:var(--gold)"></i>Left on bench</span></div>' +
+    chartSVG(team) + '<div class="pad note">Hover a bar for the numbers. Every score is also in the lists below.</div></section>';
+
+  if (ws.length > 1) {
+    const avgs = slotAverages(team);
+    const weakKeys = [...avgs].sort((a, b) => a.avg - b.avg).slice(0, 2).map(r => r.label);
+    const mx = Math.max(...avgs.map(r => r.avg));
+    h += '<section class="panel"><div class="hd"><h3>Average points by lineup slot</h3><span class="meta">Weeks 1 to ' + lastWeek(team) + '</span></div><div class="pad">' +
+      avgs.map(r => '<div class="srow' + (weakKeys.includes(r.label) ? ' weak' : '') + '"><span>' + r.label + '</span><span class="track"><i class="fill" style="width:' + Math.round(r.avg / mx * 100) + '%"></i></span><span class="num">' + f1(r.avg) + (weakKeys.includes(r.label) ? '<span class="lowest">lowest</span>' : '') + '</span></div>').join('') +
+      '</div></section>';
+  } else {
+    h += '<section class="panel"><div class="hd"><h3>Slot averages</h3></div><div class="pad note">Needs at least two weeks of data.</div></section>';
+  }
+  h += '</div>';
+
+  const all = wk.s.map(x => x[3] || 0).concat((wk.b || []).map(x => x[2] || 0));
+  const max = Math.max(20, ...all);
+  const outNames = sw ? sw.outs.map(x => x[1]) : [];
+  const inNames = sw ? sw.ins.map(p => p[1]) : [];
+  h += '<div class="grid2"><section class="panel"><div class="hd"><h3>Starters</h3><span class="meta">Week ' + cur.week + ' · same scale as bench</span></div><ul class="plist">' +
+    wk.s.map(x => prow(outNames.includes(x[1]) ? 'out' : '', slotLabel[x[0]], x[1], x[2], x[3], max, outNames.includes(x[1]) ? '<span class="badge out">▼ bench was better</span>' : '')).join('') + '</ul></section>';
+  if (wk.b) {
+    const bench = [...wk.b].sort((a, b) => (b[2] || 0) - (a[2] || 0));
+    h += '<section class="panel"><div class="hd"><h3>Bench</h3><span class="meta">Best first</span></div><ul class="plist">' +
+      bench.map(x => prow(inNames.includes(x[0]) ? 'in' : 'bn', 'BN', x[0], x[1], x[2], max, inNames.includes(x[0]) ? '<span class="badge in">▲ should have started</span>' : '')).join('') +
+      '</ul><div class="pad note">A dash means no score was listed yet.</div></section>';
+  } else {
+    h += '<section class="panel"><div class="hd"><h3>Bench</h3></div><div class="pad note">The bench was cut off in the screenshot, so there is nothing to compare for this week.</div></section>';
+  }
+  h += '</div>';
+
+  const ins = INSIGHTS[team.id];
+  h += '<div class="grid2"><section class="panel"><div class="hd"><h3>What keeps repeating</h3></div><div class="pad"><ul class="tight">' + ins.weak.map(x => '<li>' + x + '</li>').join('') + '</ul></div></section>' +
+    '<section class="panel moves"><div class="hd"><h3>Moves to consider</h3></div><div class="pad"><ul class="tight">' + ins.moves.map(x => '<li>' + x + '</li>').join('') + '</ul><p class="note" style="margin:12px 0 0">Ideas come from your rosters’ scoring. I could not check current trade values or who is available in each league, so confirm before offering.</p></div></section></div>';
+  h += '</div>';
+
+  $('#detail').innerHTML = h;
+  document.querySelectorAll('.pill:not([disabled])').forEach(b => b.onclick = () => { cur.week = Number(b.dataset.week); renderTeam(); });
+}
+
+function render() { renderCards(); renderTeam(); }
+renderHeader();
+renderMatrix();
+$('#movelist').innerHTML = MOVES.map(m => '<li>' + m[0] + '</li>').join('');
+render();
+</script>
+<script>
+(function(){var m=document.getElementById('view-main'),l=document.getElementById('view-legs'),bm=document.getElementById('tab-main'),bl=document.getElementById('tab-legs');
+function show(w){var legs=w==='legs';m.hidden=legs;l.hidden=!legs;bm.setAttribute('aria-selected',!legs);bl.setAttribute('aria-selected',legs);try{location.hash=legs?'legs':''}catch(e){}}
+bm.onclick=function(){show('main')};bl.onclick=function(){show('legs')};
+if(location.hash==='#legs')show('legs');})();
+</script>
+<script>
+(function(){var N=[{"p":"Puka Nacua","pos":"WR","tm":"LA","ms":[{"m":"5+ rec","h":4,"n":4,"v":[5,9,17,6],"mu":{"a":9.7,"avg":11.6,"rk":28,"g":"tough"}},{"m":"70+ rec yds","h":4,"n":4,"v":[74,125,138,80],"mu":{"a":161.0,"avg":150.4,"rk":10,"g":"mid"}}],"own":[],"opp":"LV","ha":"@"},{"p":"Brock Bowers","pos":"TE","tm":"LV","ms":[{"m":"4+ rec","h":4,"n":4,"v":[10,6,8,4],"mu":{"a":4.0,"avg":5.5,"rk":29,"g":"tough"}},{"m":"70+ rec yds","h":4,"n":4,"v":[116,86,110,70],"mu":{"a":29.8,"avg":53.6,"rk":30,"g":"tough"}}],"own":["DPhi"],"opp":"LA","ha":"vs"},{"p":"Christian McCaffrey","pos":"RB","tm":"SF","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[68,23,75,52,68,64],"mu":{"a":77.3,"avg":89.7,"rk":26,"g":"tough"}},{"m":"3+ rec","h":6,"n":6,"v":[5,4,4,3,3,9],"mu":{"a":5.3,"avg":4.4,"rk":3,"g":"soft"}},{"m":"70+ rush + rec yds","h":5,"n":6,"v":[88,66,116,70,83,117],"mu":{"a":109.5,"avg":120.1,"rk":23,"g":"mid"}},{"m":"1+ TD","h":5,"n":6,"v":[0,2,1,1,1,2],"mu":{"a":1.2,"avg":0.9,"rk":6,"g":"soft"}}],"own":[],"opp":"ATL","ha":"@"},{"p":"Jahmyr Gibbs","pos":"RB","tm":"DET","ms":[{"m":"50+ rush yds","h":4,"n":5,"v":[156,52,99,46,151],"mu":{"a":90.8,"avg":89.7,"rk":16,"g":"mid"}},{"m":"5+ rec","h":4,"n":5,"v":[5,6,7,4,5],"mu":{"a":4.3,"avg":4.4,"rk":15,"g":"mid"}},{"m":"100+ rush + rec yds","h":4,"n":5,"v":[186,113,164,77,207],"mu":{"a":124.8,"avg":120.1,"rk":16,"g":"mid"}},{"m":"1+ TD","h":5,"n":5,"v":[2,1,3,1,2],"mu":{"a":1.7,"avg":0.9,"rk":2,"g":"soft"}}],"own":[],"opp":"GB","ha":"vs"},{"p":"Trey McBride","pos":"TE","tm":"ARI","ms":[{"m":"7+ rec","h":6,"n":6,"v":[9,8,9,7,9,7],"mu":{"a":5.0,"avg":5.5,"rk":17,"g":"mid"}},{"m":"40+ rec yds","h":5,"n":6,"v":[95,41,75,31,66,53],"mu":{"a":54.8,"avg":53.6,"rk":13,"g":"mid"}}],"own":[],"opp":"DEN","ha":"vs"},{"p":"Jaxon Smith-Njigba","pos":"WR","tm":"SEA","ms":[{"m":"5+ rec","h":6,"n":6,"v":[8,9,10,5,5,12],"mu":{"a":9.4,"avg":11.6,"rk":29,"g":"tough"}},{"m":"100+ rec yds","h":5,"n":6,"v":[122,155,128,76,102,134],"mu":{"a":112.2,"avg":150.4,"rk":29,"g":"tough"}}],"own":["DPhi"],"opp":"KC","ha":"vs"},{"p":"Zay Flowers","pos":"WR","tm":"BAL","ms":[{"m":"5+ rec","h":5,"n":5,"v":[5,5,8,8,6],"mu":{"a":9.8,"avg":11.6,"rk":26,"g":"tough"}},{"m":"60+ rec yds","h":4,"n":5,"v":[150,84,118,53,66],"mu":{"a":123.0,"avg":150.4,"rk":28,"g":"tough"}}],"own":["DPhi"],"opp":"CIN","ha":"vs"},{"p":"Sam LaPorta","pos":"TE","tm":"DET","ms":[{"m":"5+ rec","h":4,"n":5,"v":[5,6,3,8,5],"mu":{"a":4.3,"avg":5.5,"rk":25,"g":"tough"}},{"m":"40+ rec yds","h":5,"n":5,"v":[48,52,44,84,88],"mu":{"a":34.7,"avg":53.6,"rk":28,"g":"tough"}}],"own":[],"opp":"GB","ha":"vs"},{"p":"Bryce Young","pos":"QB","tm":"CAR","ms":[{"m":"275+ pass yds","h":5,"n":5,"v":[361,287,291,329,281],"mu":{"a":237.7,"avg":235.4,"rk":14,"g":"mid"}},{"m":"2+ pass TDs","h":4,"n":5,"v":[3,3,1,2,2],"mu":{"a":1.5,"avg":1.5,"rk":14,"g":"mid"}}],"own":[],"opp":"TB","ha":"vs"},{"p":"Stefon Diggs","pos":"WR","tm":"WAS","ms":[{"m":"4+ rec","h":5,"n":5,"v":[4,5,4,5,6]}],"own":[],"opp":null},{"p":"Mike Gesicki","pos":"TE","tm":"CIN","ms":[{"m":"1+ TD","h":4,"n":4,"v":[1,1,1,1],"mu":{"a":0.5,"avg":0.5,"rk":13,"g":"mid"}}],"own":[],"opp":"BAL","ha":"@"},{"p":"D'Andre Swift","pos":"RB","tm":"CHI","ms":[{"m":"70+ rush + rec yds","h":6,"n":6,"v":[134,99,88,74,73,70],"mu":{"a":121.5,"avg":120.1,"rk":18,"g":"mid"}}],"own":["Redraft"],"opp":"NE","ha":"vs"},{"p":"Nico Collins","pos":"WR","tm":"HOU","ms":[{"m":"50+ rec yds","h":4,"n":4,"v":[75,118,56,74],"mu":{"a":132.3,"avg":150.4,"rk":27,"g":"tough"}}],"own":[],"opp":"NYG","ha":"vs"},{"p":"DeVonta Smith","pos":"WR","tm":"PHI","ms":[{"m":"50+ rec yds","h":4,"n":4,"v":[53,117,65,75],"mu":{"a":168.7,"avg":150.4,"rk":9,"g":"mid"}}],"own":[],"opp":"DAL","ha":"vs"},{"p":"Jaylen Warren","pos":"RB","tm":"PIT","ms":[{"m":"70+ rush + rec yds","h":6,"n":6,"v":[73,77,176,126,188,78],"mu":{"a":147.3,"avg":120.1,"rk":2,"g":"soft"}}],"own":["Dynasty"],"opp":"NO","ha":"@"},{"p":"Chris Olave","pos":"WR","tm":"NO","ms":[{"m":"4+ rec","h":6,"n":6,"v":[10,8,9,8,4,4],"mu":{"a":11.7,"avg":11.6,"rk":15,"g":"mid"}}],"own":[],"opp":"PIT","ha":"vs"},{"p":"Ashton Jeanty","pos":"RB","tm":"LV","ms":[{"m":"3+ rec","h":6,"n":6,"v":[6,4,3,6,3,4],"mu":{"a":4.7,"avg":4.4,"rk":10,"g":"mid"}}],"own":["Redraft"],"opp":"LA","ha":"vs"},{"p":"Derrick Henry","pos":"RB","tm":"BAL","ms":[{"m":"60+ rush yds","h":5,"n":6,"v":[144,68,89,73,102,58],"mu":{"a":82.4,"avg":89.7,"rk":20,"g":"mid"}},{"m":"70+ rush + rec yds","h":5,"n":6,"v":[163,87,89,79,120,60],"mu":{"a":114.2,"avg":120.1,"rk":21,"g":"mid"}},{"m":"1+ TD","h":5,"n":6,"v":[3,1,2,1,1,0],"mu":{"a":0.6,"avg":0.9,"rk":26,"g":"tough"}}],"own":[],"opp":"CIN","ha":"vs"},{"p":"Chuba Hubbard","pos":"RB","tm":"CAR","ms":[{"m":"50+ rush yds","h":4,"n":5,"v":[49,53,82,122,120],"mu":{"a":65.0,"avg":89.7,"rk":30,"g":"tough"}},{"m":"80+ rush + rec yds","h":4,"n":5,"v":[87,64,110,129,121],"mu":{"a":100.8,"avg":120.1,"rk":27,"g":"tough"}},{"m":"1+ TD","h":4,"n":5,"v":[2,1,0,2,1],"mu":{"a":0.3,"avg":0.9,"rk":30,"g":"tough"}}],"own":[],"opp":"TB","ha":"vs"},{"p":"James Cook","pos":"RB","tm":"BUF","ms":[{"m":"70+ rush yds","h":5,"n":6,"v":[57,135,154,75,111,95]},{"m":"80+ rush + rec yds","h":5,"n":6,"v":[69,139,154,83,118,153]},{"m":"1+ TD","h":5,"n":6,"v":[0,1,1,1,2,1]}],"own":[],"opp":null},{"p":"Kenneth Walker III","pos":"RB","tm":"KC","ms":[{"m":"100+ rush yds","h":4,"n":5,"v":[173,117,70,177,128],"mu":{"a":76.8,"avg":89.7,"rk":27,"g":"tough"}},{"m":"120+ rush + rec yds","h":4,"n":5,"v":[191,178,73,179,139],"mu":{"a":107.7,"avg":120.1,"rk":24,"g":"mid"}},{"m":"1+ TD","h":4,"n":5,"v":[2,0,2,2,2],"mu":{"a":1.0,"avg":0.9,"rk":9,"g":"mid"}}],"own":[],"opp":"SEA","ha":"@"},{"p":"Kirk Cousins","pos":"QB","tm":"LV","ms":[{"m":"225+ pass yds","h":5,"n":6,"v":[160,253,248,365,243,313],"mu":{"a":173.8,"avg":235.4,"rk":31,"g":"tough"}},{"m":"2+ pass TDs","h":5,"n":6,"v":[3,3,3,2,1,2],"mu":{"a":1.3,"avg":1.5,"rk":17,"g":"mid"}}],"own":[],"opp":"LA","ha":"vs"},{"p":"Jared Goff","pos":"QB","tm":"DET","ms":[{"m":"250+ pass yds","h":4,"n":5,"v":[206,327,269,412,271],"mu":{"a":209.2,"avg":235.4,"rk":27,"g":"tough"}},{"m":"2+ pass TDs","h":4,"n":5,"v":[2,4,2,1,3],"mu":{"a":1.2,"avg":1.5,"rk":21,"g":"mid"}}],"own":[],"opp":"GB","ha":"vs"},{"p":"Aaron Jones","pos":"RB","tm":"MIN","ms":[{"m":"50+ rush yds","h":4,"n":5,"v":[40,105,58,94,113],"mu":{"a":95.8,"avg":89.7,"rk":14,"g":"mid"}},{"m":"80+ rush + rec yds","h":4,"n":5,"v":[40,105,92,128,117],"mu":{"a":141.0,"avg":120.1,"rk":3,"g":"soft"}}],"own":[],"opp":"IND","ha":"vs"},{"p":"Patrick Mahomes","pos":"QB","tm":"KC","ms":[{"m":"225+ pass yds","h":4,"n":5,"v":[184,382,246,225,272],"mu":{"a":156.8,"avg":235.4,"rk":32,"g":"tough"}},{"m":"2+ pass TDs","h":4,"n":5,"v":[2,3,2,2,0],"mu":{"a":1.3,"avg":1.5,"rk":17,"g":"mid"}}],"own":["Redraft"],"opp":"SEA","ha":"@"},{"p":"Jonathan Taylor","pos":"RB","tm":"IND","ms":[{"m":"60+ rush yds","h":5,"n":6,"v":[98,92,68,95,45,94],"mu":{"a":72.4,"avg":89.7,"rk":29,"g":"tough"}},{"m":"80+ rush + rec yds","h":5,"n":6,"v":[121,132,72,97,82,151],"mu":{"a":90.8,"avg":120.1,"rk":31,"g":"tough"}}],"own":[],"opp":"MIN","ha":"@"},{"p":"Amon-Ra St. Brown","pos":"WR","tm":"DET","ms":[{"m":"6+ rec","h":4,"n":5,"v":[10,9,4,8,6],"mu":{"a":14.0,"avg":11.6,"rk":3,"g":"soft"}},{"m":"60+ rec yds","h":4,"n":5,"v":[67,142,19,75,69],"mu":{"a":140.5,"avg":150.4,"rk":22,"g":"mid"}}],"own":[],"opp":"GB","ha":"vs"},{"p":"Drake London","pos":"WR","tm":"ATL","ms":[{"m":"4+ rec","h":5,"n":6,"v":[2,4,9,5,7,4],"mu":{"a":11.0,"avg":11.6,"rk":18,"g":"mid"}},{"m":"50+ rec yds","h":5,"n":6,"v":[29,51,194,96,118,62],"mu":{"a":137.8,"avg":150.4,"rk":23,"g":"mid"}}],"own":["DPhi"],"opp":"SF","ha":"vs"},{"p":"Bijan Robinson","pos":"RB","tm":"ATL","ms":[{"m":"70+ rush yds","h":5,"n":6,"v":[83,72,194,145,86,61],"mu":{"a":79.7,"avg":89.7,"rk":23,"g":"mid"}},{"m":"80+ rush + rec yds","h":5,"n":6,"v":[173,81,213,147,118,53],"mu":{"a":125.7,"avg":120.1,"rk":15,"g":"mid"}}],"own":["DPhi"],"opp":"SF","ha":"vs"},{"p":"Tetairoa McMillan","pos":"WR","tm":"CAR","ms":[{"m":"5+ rec","h":4,"n":5,"v":[5,5,2,14,6],"mu":{"a":12.5,"avg":11.6,"rk":11,"g":"mid"}},{"m":"70+ rec yds","h":4,"n":5,"v":[75,101,17,192,86],"mu":{"a":145.7,"avg":150.4,"rk":18,"g":"mid"}}],"own":[],"opp":"TB","ha":"vs"},{"p":"Matthew Golden","pos":"WR","tm":"GB","ms":[{"m":"4+ rec","h":5,"n":6,"v":[6,4,5,3,6,6],"mu":{"a":14.8,"avg":11.6,"rk":2,"g":"soft"}},{"m":"50+ rec yds","h":5,"n":6,"v":[95,58,100,21,123,104],"mu":{"a":194.8,"avg":150.4,"rk":2,"g":"soft"}}],"own":[],"opp":"DET","ha":"@"},{"p":"Bhayshul Tuten","pos":"RB","tm":"JAX","ms":[{"m":"60+ rush yds","h":5,"n":6,"v":[66,65,73,73,72,39]},{"m":"80+ rush + rec yds","h":5,"n":6,"v":[88,62,90,91,96,87]}],"own":[],"opp":null},{"p":"Keenan Allen","pos":"WR","tm":"IND","ms":[{"m":"5+ rec","h":4,"n":5,"v":[6,1,6,5,8],"mu":{"a":10.2,"avg":11.6,"rk":24,"g":"mid"}}],"own":[],"opp":"MIN","ha":"@"},{"p":"Travis Kelce","pos":"TE","tm":"KC","ms":[{"m":"50+ rec yds","h":4,"n":5,"v":[71,101,59,15,53],"mu":{"a":25.5,"avg":53.6,"rk":32,"g":"tough"}}],"own":["Eddie Pineiro"],"opp":"SEA","ha":"@"},{"p":"Dak Prescott","pos":"QB","tm":"DAL","ms":[{"m":"250+ pass yds","h":5,"n":6,"v":[175,279,276,335,316,258],"mu":{"a":253.8,"avg":235.4,"rk":8,"g":"soft"}}],"own":["DPhi"],"opp":"PHI","ha":"@"},{"p":"Tyler Higbee","pos":"TE","tm":"LA","ms":[{"m":"4+ rec","h":4,"n":5,"v":[2,8,5,5,4],"mu":{"a":6.7,"avg":5.5,"rk":6,"g":"soft"}}],"own":[],"opp":"LV","ha":"@"},{"p":"George Kittle","pos":"TE","tm":"SF","ms":[{"m":"4+ rec","h":5,"n":6,"v":[2,4,6,4,5,5],"mu":{"a":6.3,"avg":5.5,"rk":9,"g":"mid"}}],"own":[],"opp":"ATL","ha":"@"},{"p":"Jordan Love","pos":"QB","tm":"GB","ms":[{"m":"2+ pass TDs","h":5,"n":6,"v":[2,2,2,2,2,1],"mu":{"a":2.8,"avg":1.5,"rk":1,"g":"soft"}}],"own":[],"opp":"DET","ha":"@"},{"p":"CeeDee Lamb","pos":"WR","tm":"DAL","ms":[{"m":"5+ rec","h":5,"n":6,"v":[5,8,7,17,2,9],"mu":{"a":13.0,"avg":11.6,"rk":9,"g":"mid"}}],"own":["Eddie Pineiro"],"opp":"PHI","ha":"@"},{"p":"Tee Higgins","pos":"WR","tm":"CIN","ms":[{"m":"50+ rec yds","h":4,"n":5,"v":[59,95,90,157,22],"mu":{"a":175.7,"avg":150.4,"rk":6,"g":"soft"}}],"own":["Redraft"],"opp":"BAL","ha":"@"},{"p":"Javonte Williams","pos":"RB","tm":"DAL","ms":[{"m":"1+ TD","h":5,"n":6,"v":[2,0,1,3,1,1],"mu":{"a":0.7,"avg":0.9,"rk":19,"g":"mid"}}],"own":["Dynasty","Redraft"],"opp":"PHI","ha":"@"},{"p":"Garrett Wilson","pos":"WR","tm":"NYJ","ms":[{"m":"4+ rec","h":5,"n":6,"v":[6,5,10,3,7,4],"mu":{"a":9.8,"avg":11.6,"rk":26,"g":"tough"}}],"own":["Dynasty","Eddie Pineiro"],"opp":"MIA","ha":"vs"},{"p":"Brock Purdy","pos":"QB","tm":"SF","ms":[{"m":"2+ pass TDs","h":5,"n":6,"v":[3,2,4,2,2,1],"mu":{"a":1.7,"avg":1.5,"rk":10,"g":"mid"}}],"own":[],"opp":"ATL","ha":"@"},{"p":"Isaiah Likely","pos":"TE","tm":"NYG","ms":[{"m":"5+ rec","h":5,"n":6,"v":[8,5,2,7,11,6],"mu":{"a":4.8,"avg":5.5,"rk":18,"g":"mid"}}],"own":["Redraft"],"opp":"HOU","ha":"@"},{"p":"Kyren Williams","pos":"RB","tm":"LA","ms":[{"m":"3+ rec","h":5,"n":6,"v":[3,2,6,10,6,3],"mu":{"a":4.2,"avg":4.4,"rk":16,"g":"mid"}}],"own":[],"opp":"LV","ha":"@"},{"p":"Michael Wilson","pos":"WR","tm":"ARI","ms":[{"m":"4+ rec","h":5,"n":6,"v":[5,2,11,7,4,4],"mu":{"a":10.8,"avg":11.6,"rk":19,"g":"mid"}}],"own":[],"opp":"DEN","ha":"vs"},{"p":"Tre Tucker","pos":"WR","tm":"LV","ms":[{"m":"4+ rec","h":5,"n":6,"v":[2,5,4,4,4,5],"mu":{"a":8.5,"avg":11.6,"rk":32,"g":"tough"}}],"own":[],"opp":"LA","ha":"vs"},{"p":"Chase Brown","pos":"RB","tm":"CIN","ms":[{"m":"3+ rec","h":4,"n":5,"v":[5,3,2,11,3],"mu":{"a":4.2,"avg":4.4,"rk":16,"g":"mid"}}],"own":["Eddie Pineiro"],"opp":"BAL","ha":"@"},{"p":"C.J. Stroud","pos":"QB","tm":"HOU","ms":[{"m":"250+ pass yds","h":5,"n":6,"v":[274,353,167,347,261,312],"mu":{"a":198.7,"avg":235.4,"rk":29,"g":"tough"}}],"own":[],"opp":"NYG","ha":"vs"},{"p":"Malik Nabers","pos":"WR","tm":"NYG","ms":[{"m":"5+ rec","h":5,"n":6,"v":[6,1,5,6,11,12],"mu":{"a":13.7,"avg":11.6,"rk":5,"g":"soft"}}],"own":[],"opp":"HOU","ha":"@"},{"p":"Malik Washington","pos":"WR","tm":"MIA","ms":[{"m":"4+ rec","h":4,"n":5,"v":[3,4,5,5,6],"mu":{"a":11.3,"avg":11.6,"rk":16,"g":"mid"}}],"own":[],"opp":"NYJ","ha":"@"},{"p":"Tyler Warren","pos":"TE","tm":"IND","ms":[{"m":"5+ rec","h":4,"n":5,"v":[3,6,9,5,7],"mu":{"a":3.2,"avg":5.5,"rk":32,"g":"tough"}}],"own":["Dynasty"],"opp":"MIN","ha":"@"},{"p":"Cam Skattebo","pos":"RB","tm":"NYG","ms":[{"m":"50+ rush yds","h":4,"n":5,"v":[81,36,60,58,59],"mu":{"a":75.8,"avg":89.7,"rk":28,"g":"tough"}}],"own":["Eddie Pineiro"],"opp":"HOU","ha":"@"},{"p":"RJ Harvey","pos":"RB","tm":"DEN","ms":[{"m":"3+ rec","h":4,"n":5,"v":[4,6,10,0,3],"mu":{"a":3.0,"avg":4.4,"rk":32,"g":"tough"}}],"own":[],"opp":"ARI","ha":"@"},{"p":"Luther Burden III","pos":"WR","tm":"CHI","ms":[{"m":"4+ rec","h":5,"n":6,"v":[5,3,7,4,4,8],"mu":{"a":11.8,"avg":11.6,"rk":13,"g":"mid"}}],"own":["Eddie Pineiro"],"opp":"NE","ha":"vs"}],C=[{"p":"Nate Sheppard","pos":"RB","tm":"Duke","cf":"ACC","ms":[{"m":"75+ rush yds","h":6,"n":6,"v":[227,147,154,116,99,77],"mu":{"rk":15,"t":"allows 153 rush yds/g","g":"soft"}},{"m":"125+ rush + rec yds","h":5,"n":6,"v":[246,188,156,124,190,175],"mu":{"rk":34,"t":"allows 174 pass, 153 rush yds/g","g":"mid"}},{"m":"1+ TD","h":6,"n":6,"v":[2,3,3,1,2,1],"mu":{"rk":34,"t":"allows 174 pass, 153 rush yds/g","g":"mid"}}],"opp":"Virginia","ha":"@"},{"p":"Dilin Jones","pos":"RB","tm":"LSU","cf":"SEC","ms":[{"m":"50+ rush yds","h":7,"n":7,"v":[113,66,106,63,78,56,84],"mu":{"rk":22,"t":"allows 143 rush yds/g","g":"mid"}},{"m":"75+ rush + rec yds","h":7,"n":7,"v":[114,80,112,85,83,140,142],"mu":{"rk":22,"t":"allows 228 pass, 143 rush yds/g","g":"mid"}}],"opp":"Auburn","ha":"@"},{"p":"KJ Duff","pos":"WR/TE","tm":"Rutgers","cf":"Big Ten","ms":[{"m":"5+ rec","h":5,"n":6,"v":[9,8,7,5,4,9],"mu":{"rk":19,"t":"allows 230 pass yds/g","g":"mid"}},{"m":"75+ rec yds","h":6,"n":6,"v":[196,137,86,131,78,113],"mu":{"rk":19,"t":"allows 230 pass yds/g","g":"mid"}},{"m":"1+ TD","h":5,"n":6,"v":[3,2,1,1,0,2],"mu":{"rk":24,"t":"allows 230 pass, 138 rush yds/g","g":"mid"}}],"opp":"Northwestern","ha":"@"},{"p":"Collin Dixon","pos":"WR/TE","tm":"Illinois","cf":"Big Ten","ms":[{"m":"6+ rec","h":5,"n":6,"v":[6,11,8,5,10,7],"mu":{"rk":32,"t":"allows 216 pass yds/g","g":"mid"}},{"m":"50+ rec yds","h":6,"n":6,"v":[70,166,131,63,116,62],"mu":{"rk":32,"t":"allows 216 pass yds/g","g":"mid"}},{"m":"1+ TD","h":5,"n":6,"v":[2,3,2,0,1,1],"mu":{"rk":37,"t":"allows 216 pass, 112 rush yds/g","g":"mid"}}],"opp":"Oregon","ha":"vs"},{"p":"Wayne Knight","pos":"RB","tm":"UCLA","cf":"Big Ten","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[71,97,177,100,103,23],"mu":{"rk":25,"t":"allows 141 rush yds/g","g":"mid"}},{"m":"75+ rush + rec yds","h":5,"n":6,"v":[101,97,200,135,115,29],"mu":{"rk":34,"t":"allows 202 pass, 141 rush yds/g","g":"mid"}},{"m":"1+ TD","h":6,"n":6,"v":[3,3,2,1,2,1],"mu":{"rk":34,"t":"allows 202 pass, 141 rush yds/g","g":"mid"}}],"opp":"Michigan St","ha":"vs"},{"p":"Jeremiah Smith","pos":"WR/TE","tm":"Ohio State","cf":"Big Ten","ms":[{"m":"4+ rec","h":7,"n":7,"v":[8,8,5,12,11,4,4]},{"m":"75+ rec yds","h":6,"n":7,"v":[151,164,85,217,206,93,68]},{"m":"1+ TD","h":6,"n":7,"v":[2,1,0,4,2,2,1]}],"opp":null},{"p":"Cayden Lee","pos":"WR/TE","tm":"Missouri","cf":"SEC","ms":[{"m":"5+ rec","h":7,"n":7,"v":[5,6,5,11,8,7,5]},{"m":"50+ rec yds","h":6,"n":7,"v":[89,120,47,156,110,94,62]}],"opp":null},{"p":"Junior Sherrill","pos":"WR/TE","tm":"Vanderbilt","cf":"SEC","ms":[{"m":"5+ rec","h":6,"n":7,"v":[4,5,6,6,7,5,8],"mu":{"rk":10,"t":"allows 250 pass yds/g","g":"soft"}},{"m":"50+ rec yds","h":7,"n":7,"v":[70,94,108,95,107,55,99],"mu":{"rk":10,"t":"allows 250 pass yds/g","g":"soft"}}],"opp":"Kentucky","ha":"@"},{"p":"Caleb Hawkins","pos":"RB","tm":"Oklahoma St","cf":"Big 12","ms":[{"m":"50+ rush yds","h":6,"n":6,"v":[79,110,72,180,83,68],"mu":{"rk":31,"t":"allows 130 rush yds/g","g":"mid"}},{"m":"100+ rush + rec yds","h":5,"n":6,"v":[108,108,88,180,115,193],"mu":{"rk":28,"t":"allows 227 pass, 130 rush yds/g","g":"mid"}}],"opp":"Colorado","ha":"vs"},{"p":"Devon Dampier","pos":"QB","tm":"Utah","cf":"Big 12","ms":[{"m":"2+ pass TDs","h":6,"n":6,"v":[3,2,2,2,3,3],"mu":{"rk":16,"t":"allows pass TDs","g":"soft"}}],"opp":"Houston","ha":"vs"},{"p":"Michael Hawkins Jr.","pos":"QB","tm":"West Virginia","cf":"Big 12","ms":[{"m":"75+ rush yds","h":7,"n":7,"v":[103,96,123,103,149,98,77],"mu":{"rk":54,"t":"allows 92 rush yds/g","g":"tough"}}],"opp":"TCU","ha":"@"},{"p":"Jeffrey Overton Jr.","pos":"RB","tm":"Virginia Tech","cf":"ACC","ms":[{"m":"75+ rush + rec yds","h":7,"n":7,"v":[104,79,112,228,82,113,114],"mu":{"rk":36,"t":"allows 189 pass, 142 rush yds/g","g":"mid"}}],"opp":"Clemson","ha":"@"},{"p":"Charlie Becker","pos":"WR/TE","tm":"Indiana","cf":"Big Ten","ms":[{"m":"50+ rec yds","h":7,"n":7,"v":[64,81,127,98,107,52,165],"mu":{"rk":60,"t":"allows 167 pass yds/g","g":"tough"}}],"opp":"Michigan","ha":"@"},{"p":"Bo Jackson","pos":"RB","tm":"Ohio State","cf":"Big Ten","ms":[{"m":"50+ rush yds","h":7,"n":7,"v":[83,74,73,53,70,107,56]}],"opp":null},{"p":"Dezmen Roebuck","pos":"WR/TE","tm":"Washington","cf":"Big Ten","ms":[{"m":"5+ rec","h":7,"n":7,"v":[7,7,9,7,5,8,5]}],"opp":null},{"p":"Malachi Toney","pos":"WR/TE","tm":"Miami","cf":"ACC","ms":[{"m":"5+ rec","h":5,"n":6,"v":[12,4,12,6,5,11],"mu":{"rk":11,"t":"allows 249 pass yds/g","g":"soft"}},{"m":"75+ rec yds","h":5,"n":6,"v":[234,96,114,120,40,154],"mu":{"rk":11,"t":"allows 249 pass yds/g","g":"soft"}},{"m":"1+ TD","h":5,"n":6,"v":[3,1,1,1,0,2],"mu":{"rk":39,"t":"allows 249 pass, 57 rush yds/g","g":"mid"}}],"opp":"Pitt","ha":"vs"},{"p":"Wyatt Young","pos":"WR/TE","tm":"Oklahoma St","cf":"Big 12","ms":[{"m":"5+ rec","h":5,"n":6,"v":[8,5,1,8,5,5],"mu":{"rk":25,"t":"allows 227 pass yds/g","g":"mid"}},{"m":"50+ rec yds","h":5,"n":6,"v":[84,121,13,192,52,99],"mu":{"rk":25,"t":"allows 227 pass yds/g","g":"mid"}},{"m":"1+ TD","h":5,"n":6,"v":[0,1,1,1,1,1],"mu":{"rk":28,"t":"allows 227 pass, 130 rush yds/g","g":"mid"}}],"opp":"Colorado","ha":"vs"},{"p":"Reed Harris","pos":"WR/TE","tm":"Arizona St","cf":"Big 12","ms":[{"m":"6+ rec","h":5,"n":6,"v":[6,9,4,7,8,7],"mu":{"rk":67,"t":"allows 136 pass yds/g","g":"tough"}},{"m":"50+ rec yds","h":5,"n":6,"v":[137,189,48,125,91,63],"mu":{"rk":67,"t":"allows 136 pass yds/g","g":"tough"}},{"m":"1+ TD","h":5,"n":6,"v":[2,2,1,0,2,1],"mu":{"rk":38,"t":"allows 136 pass, 160 rush yds/g","g":"mid"}}],"opp":"Kansas St","ha":"vs"},{"p":"Jordan Shipp","pos":"WR/TE","tm":"North Carolina","cf":"ACC","ms":[{"m":"5+ rec","h":5,"n":6,"v":[5,2,6,7,6,7],"mu":{"rk":47,"t":"allows 191 pass yds/g","g":"mid"}},{"m":"50+ rec yds","h":5,"n":6,"v":[71,25,68,109,93,75],"mu":{"rk":47,"t":"allows 191 pass yds/g","g":"mid"}}],"opp":"Syracuse","ha":"vs"},{"p":"Jayden Maiava","pos":"QB","tm":"USC","cf":"Big Ten","ms":[{"m":"250+ pass yds","h":6,"n":7,"v":[286,349,261,277,326,245,301],"mu":{"rk":57,"t":"allows 171 pass yds/g","g":"tough"}},{"m":"2+ pass TDs","h":6,"n":7,"v":[2,3,5,2,2,1,3],"mu":{"rk":64,"t":"allows pass TDs","g":"tough"}}],"opp":"Wisconsin","ha":"@"},{"p":"Ousmane Kromah","pos":"RB","tm":"Florida St","cf":"ACC","ms":[{"m":"75+ rush yds","h":5,"n":6,"v":[115,80,86,80,88,44]},{"m":"75+ rush + rec yds","h":5,"n":6,"v":[122,86,105,93,131,44]}],"opp":null},{"p":"Wayshawn Parker","pos":"RB","tm":"Utah","cf":"Big 12","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[71,53,30,174,171,98],"mu":{"rk":63,"t":"allows 83 rush yds/g","g":"tough"}},{"m":"75+ rush + rec yds","h":5,"n":6,"v":[94,118,31,239,207,109],"mu":{"rk":34,"t":"allows 265 pass, 83 rush yds/g","g":"mid"}}],"opp":"Houston","ha":"vs"},{"p":"Joseph Williams","pos":"WR/TE","tm":"Colorado","cf":"Big 12","ms":[{"m":"4+ rec","h":5,"n":6,"v":[2,4,5,11,10,5],"mu":{"rk":39,"t":"allows 207 pass yds/g","g":"mid"}},{"m":"50+ rec yds","h":5,"n":6,"v":[23,123,88,127,93,54],"mu":{"rk":39,"t":"allows 207 pass yds/g","g":"mid"}}],"opp":"Oklahoma St","ha":"@"},{"p":"Carlos Hernandez","pos":"WR/TE","tm":"Wake Forest","cf":"ACC","ms":[{"m":"5+ rec","h":6,"n":7,"v":[5,6,10,9,7,12,0]},{"m":"50+ rec yds","h":6,"n":7,"v":[165,88,69,194,87,117,0]}],"opp":null},{"p":"Isaiah Sategna III","pos":"WR/TE","tm":"Oklahoma","cf":"SEC","ms":[{"m":"4+ rec","h":5,"n":6,"v":[4,2,6,8,5,8],"mu":{"rk":6,"t":"allows 265 pass yds/g","g":"soft"}},{"m":"50+ rec yds","h":5,"n":6,"v":[76,9,101,81,64,83],"mu":{"rk":6,"t":"allows 265 pass yds/g","g":"soft"}}],"opp":"Mississippi St","ha":"@"},{"p":"Chris Marshall","pos":"WR/TE","tm":"Arkansas","cf":"SEC","ms":[{"m":"5+ rec","h":6,"n":7,"v":[7,5,7,9,7,7,1]},{"m":"50+ rec yds","h":6,"n":7,"v":[79,63,136,195,76,56,28]}],"opp":null},{"p":"Gavin Freeman","pos":"WR/TE","tm":"Baylor","cf":"Big 12","ms":[{"m":"7+ rec","h":5,"n":6,"v":[12,10,7,6,7,7],"mu":{"rk":51,"t":"allows 174 pass yds/g","g":"tough"}},{"m":"50+ rec yds","h":5,"n":6,"v":[154,104,47,59,115,76],"mu":{"rk":51,"t":"allows 174 pass yds/g","g":"tough"}}],"opp":"Kansas","ha":"@"},{"p":"Jadan Baugh","pos":"RB","tm":"Florida","cf":"SEC","ms":[{"m":"50+ rush yds","h":6,"n":7,"v":[160,136,162,142,13,59,91]},{"m":"1+ TD","h":6,"n":7,"v":[3,2,3,3,0,1,1]}],"opp":null},{"p":"Anthony Evans III","pos":"WR/TE","tm":"Mississippi St","cf":"SEC","ms":[{"m":"7+ rec","h":5,"n":6,"v":[7,7,6,8,12,7],"mu":{"rk":65,"t":"allows 151 pass yds/g","g":"tough"}},{"m":"50+ rec yds","h":5,"n":6,"v":[118,121,55,114,166,40],"mu":{"rk":65,"t":"allows 151 pass yds/g","g":"tough"}}],"opp":"Oklahoma","ha":"vs"},{"p":"Matt Fuller","pos":"RB","tm":"South Carolina","cf":"SEC","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[74,125,73,112,49,52],"mu":{"rk":37,"t":"allows 121 rush yds/g","g":"mid"}},{"m":"1+ TD","h":5,"n":6,"v":[1,1,2,1,1,0],"mu":{"rk":50,"t":"allows 159 pass, 121 rush yds/g","g":"mid"}}],"opp":"Tennessee","ha":"vs"},{"p":"J'Koby Williams","pos":"RB","tm":"Texas Tech","cf":"Big 12","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[71,116,62,36,88,165],"mu":{"rk":26,"t":"allows 140 rush yds/g","g":"mid"}},{"m":"75+ rush + rec yds","h":5,"n":6,"v":[128,132,76,60,114,173],"mu":{"rk":14,"t":"allows 294 pass, 140 rush yds/g","g":"soft"}}],"opp":"Cincinnati","ha":"@"},{"p":"Drew Mestemaker","pos":"QB","tm":"Oklahoma St","cf":"Big 12","ms":[{"m":"300+ pass yds","h":5,"n":6,"v":[241,317,324,389,304,365],"mu":{"rk":25,"t":"allows 227 pass yds/g","g":"mid"}},{"m":"2+ pass TDs","h":5,"n":6,"v":[1,2,5,3,2,3],"mu":{"rk":8,"t":"allows pass TDs","g":"soft"}}],"opp":"Colorado","ha":"vs"},{"p":"Noah Fifita","pos":"QB","tm":"Arizona","cf":"Big 12","ms":[{"m":"250+ pass yds","h":5,"n":6,"v":[279,230,325,297,284,341],"mu":{"rk":44,"t":"allows 198 pass yds/g","g":"mid"}},{"m":"2+ pass TDs","h":5,"n":6,"v":[2,1,4,4,2,3],"mu":{"rk":39,"t":"allows pass TDs","g":"mid"}}],"opp":"Iowa State","ha":"vs"},{"p":"Aiden Flora","pos":"RB","tm":"Iowa State","cf":"Big 12","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[45,89,194,54,212,86],"mu":{"rk":39,"t":"allows 116 rush yds/g","g":"mid"}},{"m":"75+ rush + rec yds","h":5,"n":6,"v":[45,92,204,107,212,85],"mu":{"rk":36,"t":"allows 214 pass, 116 rush yds/g","g":"mid"}}],"opp":"Arizona","ha":"@"},{"p":"Cam Cook","pos":"RB","tm":"West Virginia","cf":"Big 12","ms":[{"m":"50+ rush yds","h":6,"n":7,"v":[142,52,123,193,142,141,40],"mu":{"rk":54,"t":"allows 92 rush yds/g","g":"tough"}},{"m":"75+ rush + rec yds","h":6,"n":7,"v":[153,52,128,215,147,159,81],"mu":{"rk":54,"t":"allows 172 pass, 92 rush yds/g","g":"tough"}}],"opp":"TCU","ha":"@"},{"p":"Umari Hatcher","pos":"WR/TE","tm":"Syracuse","cf":"ACC","ms":[{"m":"6+ rec","h":5,"n":6,"v":[8,6,3,12,8,13],"mu":{"rk":37,"t":"allows 212 pass yds/g","g":"mid"}},{"m":"75+ rec yds","h":5,"n":6,"v":[147,77,58,152,126,224],"mu":{"rk":37,"t":"allows 212 pass yds/g","g":"mid"}}],"opp":"North Carolina","ha":"@"},{"p":"Nick Marsh","pos":"WR/TE","tm":"Indiana","cf":"Big Ten","ms":[{"m":"50+ rec yds","h":6,"n":7,"v":[17,71,81,52,120,187,57],"mu":{"rk":60,"t":"allows 167 pass yds/g","g":"tough"}},{"m":"1+ TD","h":6,"n":7,"v":[1,1,0,1,1,2,1],"mu":{"rk":58,"t":"allows 167 pass, 90 rush yds/g","g":"tough"}}],"opp":"Michigan","ha":"@"},{"p":"Deuce Alexander","pos":"WR/TE","tm":"Ole Miss","cf":"SEC","ms":[{"m":"5+ rec","h":5,"n":6,"v":[5,8,7,7,5,3],"mu":{"rk":61,"t":"allows 166 pass yds/g","g":"tough"}},{"m":"50+ rec yds","h":5,"n":6,"v":[159,76,60,134,74,20],"mu":{"rk":61,"t":"allows 166 pass yds/g","g":"tough"}}],"opp":"Texas","ha":"@"},{"p":"Jelani Thurman","pos":"WR/TE","tm":"North Carolina","cf":"ACC","ms":[{"m":"4+ rec","h":5,"n":6,"v":[4,4,3,5,6,4],"mu":{"rk":47,"t":"allows 191 pass yds/g","g":"mid"}}],"opp":"Syracuse","ha":"vs"},{"p":"Ed Small","pos":"WR/TE","tm":"TCU","cf":"Big 12","ms":[{"m":"4+ rec","h":5,"n":6,"v":[9,5,7,3,4,7],"mu":{"rk":1,"t":"allows 310 pass yds/g","g":"soft"}}],"opp":"West Virginia","ha":"vs"},{"p":"Kari Ashley","pos":"WR/TE","tm":"TCU","cf":"Big 12","ms":[{"m":"4+ rec","h":5,"n":6,"v":[3,7,5,4,6,4],"mu":{"rk":1,"t":"allows 310 pass yds/g","g":"soft"}}],"opp":"West Virginia","ha":"vs"},{"p":"King Miller","pos":"RB","tm":"USC","cf":"Big Ten","ms":[{"m":"50+ rush yds","h":6,"n":7,"v":[63,45,128,102,74,81,102],"mu":{"rk":40,"t":"allows 116 rush yds/g","g":"mid"}}],"opp":"Wisconsin","ha":"@"},{"p":"Duke Watson","pos":"RB","tm":"UCF","cf":"Big 12","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[110,10,177,57,50,79],"mu":{"rk":61,"t":"allows 86 rush yds/g","g":"tough"}}],"opp":"BYU","ha":"vs"},{"p":"Justice Haynes","pos":"RB","tm":"Georgia Tech","cf":"ACC","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[64,81,141,107,69,0],"mu":{"rk":11,"t":"allows 160 rush yds/g","g":"soft"}}],"opp":"Boston College","ha":"vs"},{"p":"Jordan Allen","pos":"WR/TE","tm":"Georgia Tech","cf":"ACC","ms":[{"m":"4+ rec","h":5,"n":6,"v":[8,4,2,4,10,10],"mu":{"rk":58,"t":"allows 169 pass yds/g","g":"tough"}}],"opp":"Boston College","ha":"vs"},{"p":"Dalen Penson","pos":"WR/TE","tm":"Georgia Tech","cf":"ACC","ms":[{"m":"50+ rec yds","h":5,"n":6,"v":[73,58,58,52,13,86],"mu":{"rk":58,"t":"allows 169 pass yds/g","g":"tough"}}],"opp":"Boston College","ha":"vs"},{"p":"Javon Tracy","pos":"WR/TE","tm":"Minnesota","cf":"Big Ten","ms":[{"m":"5+ rec","h":5,"n":6,"v":[5,7,5,7,3,5],"mu":{"rk":38,"t":"allows 209 pass yds/g","g":"mid"}}],"opp":"Iowa","ha":"vs"},{"p":"Noah Jennings","pos":"WR/TE","tm":"Minnesota","cf":"Big Ten","ms":[{"m":"50+ rec yds","h":5,"n":6,"v":[57,88,72,58,70,15],"mu":{"rk":38,"t":"allows 209 pass yds/g","g":"mid"}}],"opp":"Iowa","ha":"vs"},{"p":"Hudson Clement","pos":"WR/TE","tm":"Illinois","cf":"Big Ten","ms":[{"m":"4+ rec","h":5,"n":6,"v":[3,4,5,5,4,6],"mu":{"rk":32,"t":"allows 216 pass yds/g","g":"mid"}}],"opp":"Oregon","ha":"vs"},{"p":"Darian Mensah","pos":"QB","tm":"Miami","cf":"ACC","ms":[{"m":"3+ pass TDs","h":5,"n":6,"v":[5,3,3,3,1,3],"mu":{"rk":34,"t":"allows pass TDs","g":"mid"}}],"opp":"Pitt","ha":"vs"},{"p":"Byrum Brown","pos":"QB","tm":"Auburn","cf":"SEC","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[27,88,65,57,107,115],"mu":{"rk":58,"t":"allows 88 rush yds/g","g":"tough"}}],"opp":"LSU","ha":"vs"},{"p":"Chas Nimrod","pos":"WR/TE","tm":"Auburn","cf":"SEC","ms":[{"m":"4+ rec","h":5,"n":6,"v":[4,7,6,5,3,6],"mu":{"rk":59,"t":"allows 168 pass yds/g","g":"tough"}}],"opp":"LSU","ha":"vs"},{"p":"Kamario Taylor","pos":"QB","tm":"Mississippi St","cf":"SEC","ms":[{"m":"3+ pass TDs","h":5,"n":6,"v":[4,3,4,3,3,0],"mu":{"rk":48,"t":"allows pass TDs","g":"mid"}}],"opp":"Oklahoma","ha":"vs"},{"p":"DeSean Bishop","pos":"RB","tm":"Tennessee","cf":"SEC","ms":[{"m":"1+ TD","h":6,"n":7,"v":[1,2,1,0,3,1,2],"mu":{"rk":32,"t":"allows 237 pass, 104 rush yds/g","g":"mid"}}],"opp":"South Carolina","ha":"@"},{"p":"Mike Matthews","pos":"WR/TE","tm":"Tennessee","cf":"SEC","ms":[{"m":"4+ rec","h":6,"n":7,"v":[4,2,4,4,4,4,7],"mu":{"rk":15,"t":"allows 237 pass yds/g","g":"soft"}}],"opp":"South Carolina","ha":"@"},{"p":"Sedrick Alexander","pos":"RB","tm":"Vanderbilt","cf":"SEC","ms":[{"m":"1+ TD","h":6,"n":7,"v":[1,1,1,1,1,0,1],"mu":{"rk":22,"t":"allows 250 pass, 127 rush yds/g","g":"mid"}}],"opp":"Kentucky","ha":"@"},{"p":"Justin Bowick","pos":"WR/TE","tm":"Oklahoma St","cf":"Big 12","ms":[{"m":"1+ TD","h":5,"n":6,"v":[1,0,2,1,1,1],"mu":{"rk":28,"t":"allows 227 pass, 130 rush yds/g","g":"mid"}}],"opp":"Colorado","ha":"vs"},{"p":"Omarion Miller","pos":"WR/TE","tm":"Arizona St","cf":"Big 12","ms":[{"m":"4+ rec","h":5,"n":6,"v":[8,9,3,5,6,4],"mu":{"rk":67,"t":"allows 136 pass yds/g","g":"tough"}}],"opp":"Kansas St","ha":"vs"},{"p":"Legend Glasker","pos":"WR/TE","tm":"BYU","cf":"Big 12","ms":[{"m":"50+ rec yds","h":5,"n":6,"v":[65,74,131,9,99,66],"mu":{"rk":16,"t":"allows 237 pass yds/g","g":"soft"}}],"opp":"UCF","ha":"@"},{"p":"Mason McKenzie","pos":"QB","tm":"Boston College","cf":"ACC","ms":[{"m":"50+ rush yds","h":5,"n":6,"v":[78,94,53,138,74,7],"mu":{"rk":5,"t":"allows 179 rush yds/g","g":"soft"}}],"opp":"Georgia Tech","ha":"@"},{"p":"Evan Dickens","pos":"RB","tm":"Boston College","cf":"ACC","ms":[{"m":"1+ TD","h":5,"n":6,"v":[1,1,1,0,1,1],"mu":{"rk":20,"t":"allows 213 pass, 179 rush yds/g","g":"mid"}}],"opp":"Georgia Tech","ha":"@"},{"p":"JV Gibson","pos":"WR/TE","tm":"Cincinnati","cf":"Big 12","ms":[{"m":"50+ rec yds","h":5,"n":6,"v":[54,79,68,66,0,75],"mu":{"rk":3,"t":"allows 282 pass yds/g","g":"soft"}}],"opp":"Texas Tech","ha":"vs"},{"p":"Cataurus Hicks","pos":"WR/TE","tm":"Pitt","cf":"ACC","ms":[{"m":"50+ rec yds","h":6,"n":7,"v":[114,64,8,66,63,50,135],"mu":{"rk":27,"t":"allows 223 pass yds/g","g":"mid"}}],"opp":"Miami","ha":"@"},{"p":"Chase Hendricks","pos":"WR/TE","tm":"California","cf":"ACC","ms":[{"m":"5+ rec","h":6,"n":7,"v":[6,5,9,4,8,7,8],"mu":{"rk":53,"t":"allows 173 pass yds/g","g":"tough"}}],"opp":"SMU","ha":"@"},{"p":"Que'Sean Brown","pos":"WR/TE","tm":"Virginia Tech","cf":"ACC","ms":[{"m":"6+ rec","h":6,"n":7,"v":[6,7,5,8,7,7,6],"mu":{"rk":48,"t":"allows 189 pass yds/g","g":"mid"}}],"opp":"Clemson","ha":"@"},{"p":"Luke Reynolds","pos":"WR/TE","tm":"Virginia Tech","cf":"ACC","ms":[{"m":"4+ rec","h":6,"n":7,"v":[5,8,12,5,7,4,2],"mu":{"rk":48,"t":"allows 189 pass yds/g","g":"mid"}}],"opp":"Clemson","ha":"@"},{"p":"Chris Durr Jr.","pos":"WR/TE","tm":"Maryland","cf":"Big Ten","ms":[{"m":"6+ rec","h":6,"n":7,"v":[6,10,12,7,7,4,6]}],"opp":null},{"p":"Griffin Wilde","pos":"WR/TE","tm":"Northwestern","cf":"Big Ten","ms":[{"m":"50+ rec yds","h":5,"n":6,"v":[104,85,56,36,144,57],"mu":{"rk":30,"t":"allows 217 pass yds/g","g":"mid"}}],"opp":"Rutgers","ha":"vs"},{"p":"Julian Sayin","pos":"QB","tm":"Ohio State","cf":"Big Ten","ms":[{"m":"2+ pass TDs","h":6,"n":7,"v":[3,1,2,4,3,4,2]}],"opp":null},{"p":"Evan Stewart","pos":"WR/TE","tm":"Oregon","cf":"Big Ten","ms":[{"m":"50+ rec yds","h":5,"n":6,"v":[72,78,72,56,74,0],"mu":{"rk":12,"t":"allows 248 pass yds/g","g":"soft"}}],"opp":"Illinois","ha":"@"},{"p":"Jordon Davison","pos":"RB","tm":"Oregon","cf":"Big Ten","ms":[{"m":"1+ TD","h":5,"n":6,"v":[1,1,2,1,1,0],"mu":{"rk":23,"t":"allows 248 pass, 127 rush yds/g","g":"mid"}}],"opp":"Illinois","ha":"@"},{"p":"Lawayne McCoy","pos":"WR/TE","tm":"Louisville","cf":"ACC","ms":[{"m":"50+ rec yds","h":6,"n":7,"v":[62,102,62,75,41,78,93]}],"opp":null},{"p":"Trinidad Chambliss","pos":"QB","tm":"Ole Miss","cf":"SEC","ms":[{"m":"2+ pass TDs","h":5,"n":6,"v":[3,2,2,1,3,3],"mu":{"rk":62,"t":"allows pass TDs","g":"tough"}}],"opp":"Texas","ha":"@"},{"p":"Kevin Jennings","pos":"QB","tm":"SMU","cf":"ACC","ms":[{"m":"2+ pass TDs","h":4,"n":5,"v":[5,1,3,2,2],"mu":{"rk":28,"t":"allows pass TDs","g":"mid"}}],"opp":"California","ha":"vs"},{"p":"Kendrick Raphael","pos":"RB","tm":"SMU","cf":"ACC","ms":[{"m":"1+ TD","h":4,"n":5,"v":[1,3,1,1,0],"mu":{"rk":22,"t":"allows 206 pass, 180 rush yds/g","g":"mid"}}],"opp":"California","ha":"vs"},{"p":"Yamir Knight","pos":"WR/TE","tm":"SMU","cf":"ACC","ms":[{"m":"50+ rec yds","h":4,"n":5,"v":[62,70,164,22,51],"mu":{"rk":40,"t":"allows 206 pass yds/g","g":"mid"}}],"opp":"California","ha":"vs"}],META={"nflWeek": 6, "cfbThrough": "Oct 17"};var sport='nfl',pos='All',mine=false,conf='All',soft=false;
+var S=document.getElementById('sportbar'),f=document.getElementById('legfilters'),L=document.getElementById('leglist'),C0=document.getElementById('legcount'),H=document.getElementById('propsh'),NT=document.getElementById('legnote'),B=document.getElementById('bestbets'),SG=document.getElementById('suggest');
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function pill(a,t,on){return '<button class="pill" '+a+' aria-pressed="'+on+'">'+t+'</button>'}
+function ord(n){var s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
+function tag(m,nfl){if(!m.mu)return '';var g=m.mu.g,lab=g==='soft'?'Soft':(g==='tough'?'Tough':'Even');var tip=nfl?('Opponent allows '+m.mu.a+' per game to this position, league average '+m.mu.avg+'. '+ord(m.mu.rk)+' most of 32.'):(m.mu.t+', '+ord(m.mu.rk)+' most of 67 Power 5 teams');return '<span class="mu '+g+'" title="'+esc(tip)+'">'+lab+' · '+ord(m.mu.rk)+'</span>'}
+function best(D){var a=[];D.forEach(function(r){if(!r.opp)return;r.ms.forEach(function(m){if(m.mu&&m.mu.g==='soft'&&m.h/m.n>=0.8)a.push({r:r,m:m,s:(m.h/m.n)*100-m.mu.rk})})});a.sort(function(x,y){return y.s-x.s});return a.slice(0,8)}
+function suggest(D){var c=[];D.forEach(function(r){if(!r.opp)return;var b=null;r.ms.forEach(function(m){if(m.h/m.n<0.8)return;var g=m.mu?m.mu.g:'mid';if(g==='tough')return;var sc=m.h/m.n+(g==='soft'?0.15:0)+(m.mu?(40-Math.min(m.mu.rk,40))/400:0)+(m.n>=6?0.02:0);if(!b||sc>b.sc)b={r:r,m:m,sc:sc}});if(b)c.push(b)});c.sort(function(x,y){return y.sc-x.sc});var used={},out=[];c.forEach(function(x){var k=[x.r.tm,x.r.opp].sort().join('/');if(used[k])return;used[k]=1;out.push(x)});
+var tiers=[['Safest 2-leg',out.slice(0,2)],['Balanced 3-leg',out.slice(2,5)],['Longer 4-leg',out.slice(5,9)]];return tiers.filter(function(t){return t[1].length>=2})}
+function draw(){var nfl=sport==='nfl';var D=nfl?N:C;
+var rows=D.filter(function(r){var pk=pos==='All'||r.pos===pos;var ok=nfl?(!mine||r.own.length):(conf==='All'||r.cf===conf);var sf=!soft||(r.opp&&r.ms.some(function(m){return m.mu&&m.mu.g==='soft'}));return pk&&ok&&sf});
+H.textContent=nfl?'Every NFL player, Weeks 1 to '+META.nflWeek:'Power 5 college players, through '+META.cfbThrough;
+NT.textContent=nfl?'Covers every QB, RB, WR and TE in the NFL with at least 4 games played, using nflverse game stats. A milestone shows only if the player cleared it in 80% or more of his games, and each row shows the highest one that qualifies. Matchup tags compare the Week 7 opponent with the league: it is ranked by how much of the relevant stat it has allowed per game to that position (receptions, yards, TDs) through Week 6. Soft means top 8 of 32, Tough means bottom 8. This ignores injuries, weather, game script and who covers whom, and the sample is six games, so treat it as a nudge. These are stat milestones, not sportsbook lines.':'Covers players from ACC, Big 12, Big Ten and SEC teams that have played at least 5 games, using ESPN box scores. Pac-12 and independents such as Notre Dame are not included. A milestone shows only if the player cleared it in 80% of his team’s games or more, so a game he missed counts against him. Matchup tags rank the opponent among the 67 Power 5 teams by passing and rushing yards allowed per game (receiving stats use passing yards allowed). Soft means top quarter, Tough means bottom quarter. Opponents outside those four conferences have no rating, and the sample is five to seven games. Positions are guessed from carries and catches. These are stat milestones, not sportsbook lines.';
+C0.textContent=rows.length+' players';
+var sg=suggest(D);SG.innerHTML=sg.length?'<h3 class="bbh">Suggested parlays</h3><div class="sgrid">'+sg.map(function(t){return '<div class="sg"><b class="sgt">'+t[0]+'</b><ul class="bbl1">'+t[1].map(function(x){return '<li><b>'+esc(x.r.p)+'</b> <span class="note">'+esc(x.r.tm)+' '+(x.r.ha==='@'?'at':'vs')+' '+esc(x.r.opp)+'</span><br>'+esc(x.m.m)+' <span class="hit">'+x.m.h+'/'+x.m.n+'</span> '+tag(x.m,nfl)+'</li>'}).join('')+'</ul></div>'}).join('')+'</div><p class="note" style="margin:8px 0 0">Built from hit rates (80% or better) and the opponent matchup, one player per game. It rebuilds from the data each time the page loads, and I refresh the data when you ask. Each leg is a stat milestone, not a sportsbook line, so check the real number and price before you use any of these. Legs in one parlay can be linked and sample sizes are small, so none of this is a forecast.</p>':'';var bb=best(D);
+B.innerHTML=bb.length?'<h3 class="bbh">Best matchups this week</h3><ul class="bbl">'+bb.map(function(x){return '<li><b>'+esc(x.r.p)+'</b> <span class="note">'+x.r.pos+' · '+esc(x.r.tm)+' '+(x.r.ha==='@'?'at':'vs')+' '+esc(x.r.opp)+'</span><br>'+esc(x.m.m)+' <span class="hit">'+x.m.h+'/'+x.m.n+'</span> '+tag(x.m,nfl)+'</li>'}).join('')+'</ul><p class="note" style="margin:8px 0 0">Needs a hit rate of 80% or better against a defense in the top 8 (NFL) or top quarter (college) for yards allowed.</p>':'';
+L.innerHTML=rows.length?rows.map(function(r){var nx=r.opp?((r.ha==='@'?'at ':'vs ')+esc(r.opp)):'bye or no listed game';return '<div class="lrow"><div class="who"><b>'+esc(r.p)+(r.own&&r.own.length?'<span class="own">'+esc(r.own.join(', '))+'</span>':'')+'</b><span class="note">'+r.pos+' · '+esc(r.tm)+(r.cf?' · '+esc(r.cf):'')+'</span><span class="note nx">Next: '+nx+'</span></div><div class="ms">'+r.ms.map(function(m){return '<div class="m"><span class="hit'+(m.h===m.n?' all':'')+'">'+m.h+'/'+m.n+'</span><span>'+esc(m.m)+'</span>'+tag(m,nfl)+'<span class="vals">'+m.v.join(' · ')+'</span></div>'}).join('')+'</div></div>'}).join(''):'<p class="note">Nobody matches this filter.</p>';
+S.innerHTML=pill('data-s="nfl"','NFL',nfl)+pill('data-s="cfb"','College',!nfl);
+var ps=nfl?['All','QB','RB','WR','TE']:['All','QB','RB','WR/TE'];
+f.innerHTML=ps.map(function(p){return pill('data-p="'+p+'"',p,pos===p)}).join('')+pill('data-soft="1"','Soft matchup',soft)+(nfl?pill('data-mine="1"','My players',mine):['Big Ten','SEC','ACC','Big 12'].map(function(c){return pill('data-c="'+c+'"',c,conf===c)}).join(''));
+S.querySelectorAll('button').forEach(function(b){b.onclick=function(){sport=b.dataset.s;pos='All';conf='All';mine=false;soft=false;draw()}});
+f.querySelectorAll('button').forEach(function(b){b.onclick=function(){if(b.dataset.mine)mine=!mine;else if(b.dataset.soft)soft=!soft;else if(b.dataset.c)conf=conf===b.dataset.c?'All':b.dataset.c;else pos=b.dataset.p;draw()}})}
+draw();})();
+</script>
+
+
+
+
+
+
+
+
+
