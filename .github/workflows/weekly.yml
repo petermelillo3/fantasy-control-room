@@ -1,0 +1,34 @@
+name: Weekly refresh
+
+on:
+  schedule:
+    # 14:00 UTC is 10:00 AM EDT now and 9:00 AM EST after the clocks change.
+    # Tuesday catches Monday night's games; Wednesday catches late stat corrections.
+    - cron: '0 14 * * 2'
+    - cron: '0 14 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas requests
+      - run: python build.py
+      - name: Commit changes
+        run: |
+          git config user.name "fantasy-control-room bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed"
+          else
+            git commit -m "Weekly refresh"
+            git push
+          fi

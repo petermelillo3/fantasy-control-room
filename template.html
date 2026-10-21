@@ -1,0 +1,550 @@
+<title>Fantasy Control Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: field-style header with a season ruler, one card per team (trend line), league heat table, then one team's lineups drawn as bars on a shared scale. Dark first, light variant below. */
+  :root{
+    --bg:#0c110f; --panel:#141a17; --panel2:#1a221e; --line:#27322c;
+    --ink:#eef2ee; --ink2:#b0bbb3; --ink3:#8d9b92;
+    --turf:#4c9e6c; --on-turf:#08100b;
+    --gold:#e3b23c; --gold-ink:#e3b23c; --on-gold:#0d1210;
+    --bad:#e0705c; --neutral:#4a5750; --stripe:rgba(255,255,255,.035);
+    --a-eddie:#5b9bd5; --a-redraft:#4c9e6c; --a-mdyn:#e3b23c; --a-dphi:#b48ae0;
+    --display:'Teko','Arial Narrow',sans-serif;
+    --body:'Work Sans',system-ui,sans-serif;
+    color-scheme:dark;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#eef2ee; --panel:#ffffff; --panel2:#e6ede7; --line:#cbd6ce;
+      --ink:#142019; --ink2:#425248; --ink3:#5a6b60;
+      --turf:#2f7a4d; --on-turf:#ffffff;
+      --gold:#d9a21b; --gold-ink:#8a6400; --on-gold:#142019;
+      --bad:#b03a28; --neutral:#a9b6ad; --stripe:rgba(0,0,0,.035);
+      --a-eddie:#2f6fae; --a-redraft:#2f7a4d; --a-mdyn:#b07d00; --a-dphi:#7a4fb8;
+      color-scheme:light;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2ee; --panel:#ffffff; --panel2:#e6ede7; --line:#cbd6ce;
+    --ink:#142019; --ink2:#425248; --ink3:#5a6b60;
+    --turf:#2f7a4d; --on-turf:#ffffff;
+    --gold:#d9a21b; --gold-ink:#8a6400; --on-gold:#142019;
+    --bad:#b03a28; --neutral:#a9b6ad; --stripe:rgba(0,0,0,.035);
+    --a-eddie:#2f6fae; --a-redraft:#2f7a4d; --a-mdyn:#b07d00; --a-dphi:#7a4fb8;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;padding-inline:16px;padding-block:0 64px}
+  .wrap{max-width:1060px;margin-inline:auto}
+  h1,h2,h3{font-family:var(--display);font-weight:500;margin:0;text-wrap:balance}
+  h2{font-size:28px;line-height:1.05}
+  h3{font-size:21px}
+
+  /* header */
+  header.top{
+    margin-inline:-16px;padding:34px 16px 22px;margin-bottom:24px;
+    background:
+      linear-gradient(180deg,color-mix(in srgb,var(--turf) 26%,var(--bg)),var(--bg)),
+      repeating-linear-gradient(90deg,var(--stripe) 0 64px,transparent 64px 128px);
+    border-bottom:1px solid var(--line);
+  }
+  .top-in{max-width:1060px;margin-inline:auto;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px 40px;align-items:end}
+  @media (max-width:760px){.top-in{grid-template-columns:1fr}}
+  .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-ink);font-weight:600}
+  h1{font-weight:600;font-size:clamp(46px,10vw,84px);line-height:.9;margin:6px 0 10px}
+  .sub{color:var(--ink2);max-width:56ch;margin:0}
+  .score{display:flex;gap:28px;flex-wrap:wrap}
+  .score .n{font-family:var(--display);font-size:clamp(48px,8vw,68px);line-height:.9;font-weight:600;font-variant-numeric:tabular-nums}
+  .score .n.g{color:var(--gold-ink)}
+  .score .l{font-size:12.5px;color:var(--ink2);max-width:22ch;line-height:1.35;margin-top:4px}
+  .ruler{max-width:1060px;margin:22px auto 0}
+  .ruler .ticks{display:grid;grid-template-columns:repeat(18,1fr);gap:3px}
+  .ruler .ticks i{display:block;height:10px;background:var(--line)}
+  .ruler .ticks i.done{background:var(--turf)}
+  .ruler .ticks i.now{background:var(--gold);height:16px;align-self:end}
+  .ruler .cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3);margin-top:6px}
+
+  /* team cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));gap:14px;margin-bottom:24px}
+  .tcard{
+    text-align:left;font:inherit;color:inherit;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--a);
+    padding:14px 16px 12px;display:grid;gap:6px;min-width:0;
+  }
+  .tcard:hover{background:var(--panel2)}
+  .tcard[aria-pressed="true"]{outline:2px solid var(--a);outline-offset:-2px;background:var(--panel2)}
+  .tcard:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .tc-name{font-family:var(--display);font-size:25px;line-height:1.05;display:block}
+  .tc-sub{font-size:11.5px;color:var(--ink3);display:block}
+  .tc-big{font-family:var(--display);font-size:46px;font-weight:600;line-height:.95;font-variant-numeric:tabular-nums;display:block;margin-top:4px}
+  .tc-big small{font-family:var(--body);font-size:12px;font-weight:400;color:var(--ink2);margin-left:6px}
+  .tc-foot{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink2);flex-wrap:wrap}
+  .tc-foot b{color:var(--ink);font-weight:600}
+  .tc-foot b.g{color:var(--gold-ink)}
+  svg.spark{display:block;width:100%;height:auto}
+  .spark-empty{font-size:12px;color:var(--ink3);height:56px;display:flex;align-items:center}
+
+  /* panels */
+  .panel{background:var(--panel);border:1px solid var(--line);margin-bottom:20px;min-width:0}
+  .panel>.hd{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:4px 12px;flex-wrap:wrap}
+  .meta{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+  .pad{padding:14px 16px}
+  .note{color:var(--ink3);font-size:12.5px}
+  .tabs{display:flex;gap:8px;margin:0 0 20px;flex-wrap:wrap}
+  .tabbtn{font-family:var(--display);font-size:22px;letter-spacing:.04em;background:none;color:var(--ink2);border:1px solid var(--line);padding:2px 20px;cursor:pointer}
+  .tabbtn:hover{background:var(--panel2)}
+  .tabbtn[aria-selected="true"]{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+  .tabbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .legh{font-family:var(--display);font-size:clamp(40px,7vw,56px);line-height:.95;margin:0 0 6px;letter-spacing:.03em}
+  .legintro{padding-left:0;padding-right:0}
+  [hidden]{display:none!important}
+  .lrow{display:grid;grid-template-columns:minmax(150px,1.1fr) 3fr;gap:6px 16px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .lrow .who b{display:block}
+  .lrow .ms{display:flex;flex-direction:column;gap:5px}
+  .lrow .m{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .lrow .m .hit{font-family:var(--display);font-size:20px;line-height:1;min-width:2.4em;font-variant-numeric:tabular-nums}
+  .lrow .m .hit.all{color:var(--gold)}
+  .lrow .vals{color:var(--ink3);font-size:12.5px;font-variant-numeric:tabular-nums}
+  .own{font-size:10.5px;font-weight:700;letter-spacing:.06em;background:var(--gold);color:var(--on-gold);padding:1px 7px;margin-left:6px;white-space:nowrap}
+  @media(max-width:560px){.lrow{grid-template-columns:1fr}}
+  .best{border:1px solid var(--gold);padding:12px 16px;margin-bottom:16px;background:var(--panel2)}
+  .best:empty{display:none}
+  .bbh{font-family:var(--display);font-size:24px;margin:0 0 6px;letter-spacing:.03em}
+  .bbl{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 20px}
+  .bbl .hit{font-family:var(--display);font-size:18px}
+  .mu{font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:1px 7px;white-space:nowrap;border:1px solid var(--line);cursor:help}
+  .mu.soft{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+  .mu.tough{color:var(--bad);border-color:var(--bad)}
+  .mu.mid{color:var(--ink3)}
+  .nx{display:block}
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .sg{border:1px solid var(--line);padding:10px 12px;background:var(--panel)}
+  .sgt{font-family:var(--display);font-size:20px;letter-spacing:.03em;display:block;margin-bottom:6px}
+  .bbl1{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .bbl1 .hit{font-family:var(--display);font-size:18px}
+  .tablewrap{overflow-x:auto}
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink3);font-weight:500;text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  th.n{text-align:right}
+  td.c{text-align:right;font-family:var(--display);font-size:20px}
+  .muted{color:var(--ink3)}
+  a{color:var(--gold-ink)}
+
+  /* team detail */
+  #detail{scroll-margin-top:12px}
+  .dhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .dot{width:14px;height:44px;background:var(--a)}
+  .dhead h2{font-size:clamp(34px,6vw,46px);line-height:.95}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .chip{font-size:11px;padding:2px 8px;border:1px solid var(--line);color:var(--ink2);background:var(--panel2)}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .pill{font-family:var(--display);font-size:21px;background:none;color:var(--ink2);border:1px solid var(--line);padding:1px 16px;cursor:pointer}
+  .pill:hover:not([disabled]){background:var(--panel2)}
+  .pill[aria-pressed="true"]{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+  .pill[disabled]{opacity:.4;cursor:default}
+  .pill:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:18px}
+  .stat{background:var(--panel);padding:12px 14px}
+  .stat .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3)}
+  .stat .v{font-family:var(--display);font-size:36px;line-height:1.05;font-variant-numeric:tabular-nums}
+  .stat .v.g{color:var(--gold-ink)}
+  .stat .d{font-size:12px;color:var(--ink2)}
+  .flag{border:1px solid var(--gold);background:color-mix(in srgb,var(--gold) 10%,transparent);padding:12px 14px;margin-bottom:18px;display:grid;gap:4px}
+  .flag.ok{border-color:var(--turf);background:color-mix(in srgb,var(--turf) 10%,transparent)}
+  .flag.info{border-color:var(--line);background:var(--panel2)}
+  .flag .row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:1px 7px;white-space:nowrap}
+  .tag.start{background:var(--gold);color:var(--on-gold)}
+  .tag.sit{background:var(--bad);color:#fff}
+  .gain{font-family:var(--display);font-size:26px;line-height:1;color:var(--gold-ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr}}
+  .grid2>*{min-width:0}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink2);padding:12px 16px 0}
+  .sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+  svg.chart{display:block;width:100%;max-width:560px;height:auto;margin:6px auto 4px}
+  svg.chart text{font-family:var(--body);fill:var(--ink2)}
+  svg.chart .val{font-weight:600;fill:var(--on-turf)}
+  svg.chart .leak{fill:var(--ink);font-weight:600}
+  svg.chart .grid{stroke:var(--line);stroke-width:1}
+  svg.chart g.b:hover path{filter:brightness(1.18)}
+
+  .plist{list-style:none;margin:0;padding:6px 16px 12px;display:grid;gap:2px}
+  .prow{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:3px 10px;align-items:baseline;padding:7px 8px;margin-inline:-8px}
+  .prow .pn{min-width:0;overflow-wrap:anywhere}
+  .prow .pp{font-style:normal;color:var(--ink3);font-size:12px;margin-left:4px}
+  .prow .bar{grid-column:2 / 4;height:8px;background:var(--panel2)}
+  .prow .bar i{display:block;height:8px;background:var(--turf);border-radius:0 4px 4px 0}
+  .prow.bn .bar i{background:var(--neutral)}
+  .prow.in .bar i{background:var(--gold)}
+  .prow.out{background:color-mix(in srgb,var(--bad) 10%,transparent)}
+  .prow.in{background:color-mix(in srgb,var(--gold) 13%,transparent)}
+  .pv{font-family:var(--display);font-size:23px;line-height:1;font-variant-numeric:tabular-nums}
+  .pv.neg{color:var(--bad)}
+  .slot{font-size:10px;font-weight:600;letter-spacing:.04em;padding:2px 0;border:1px solid var(--line);background:var(--panel2);color:var(--ink2);text-align:center}
+  .badge{font-size:10.5px;font-weight:600;letter-spacing:.04em;margin-left:8px;white-space:nowrap}
+  .badge.in{color:var(--gold-ink)} .badge.out{color:var(--bad)}
+
+  .srow{display:grid;grid-template-columns:62px minmax(0,1fr) 62px;align-items:center;gap:10px;padding:5px 0;font-size:13px}
+  .srow .track{height:10px;background:var(--panel2)}
+  .srow .fill{display:block;height:10px;background:var(--turf);border-radius:0 5px 5px 0}
+  .srow.weak .fill{background:var(--gold)}
+  .srow .num{text-align:right;font-variant-numeric:tabular-nums}
+  .lowest{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);font-weight:600}
+
+  ul.tight{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+  ul.tight li{max-width:68ch;padding-left:18px;position:relative}
+  ul.tight li::before{content:"";position:absolute;left:0;top:.55em;width:8px;height:8px;background:var(--m,var(--gold))}
+  .moves ul.tight li::before{background:var(--turf)}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="top-in">
+    <div>
+      <div class="eyebrow">Four teams, one view</div>
+      <h1>Fantasy Control Room</h1>
+      <p class="sub">Starter points, best possible lineups and the weak spots that keep coming back. Scores are copied from each platform's own weekly roster view, so they use each league's real scoring.</p>
+    </div>
+    <div class="score" id="score"></div>
+  </div>
+  <div class="ruler" aria-label="Season progress">
+    <div class="ticks" id="ticks"></div>
+    <div class="cap"><span>Week 1</span><span id="capmid">Through Week __THROUGH__ of 18</span><span>Week 18</span></div>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Dashboard sections">
+  <button role="tab" id="tab-main" aria-selected="true" aria-controls="view-main" class="tabbtn">Control Room</button>
+  <button role="tab" id="tab-legs" aria-selected="false" aria-controls="view-legs" class="tabbtn">PARLAY PAL</button>
+</nav>
+<div id="view-main" role="tabpanel" aria-labelledby="tab-main">
+<section class="cards" id="cards" aria-label="Teams"></section>
+
+<section class="panel" aria-labelledby="matrixh">
+  <div class="hd"><h2 id="matrixh">Points left on the bench</h2><span class="meta">Best possible lineup minus the lineup you set</span></div>
+  <div class="scroll"><table id="matrix"></table></div>
+  <div class="pad note">Best possible lineup uses everyone on your active roster that week, so it is a hindsight ceiling, not a realistic target. Taxi and IR players are left out. * means that week was not final when pulled. Correction: the first version of this page had wrong Week 1 starter totals for DPhi Dynasty (137.94, now 117.32), Melillo Dynasty (109.66, now 110.26) and the Eddie Pineiro team (110.26, now 109.86 before Kelce). Every total here is now added up by the page from the individual scores.</div>
+</section>
+
+<div id="detail"></div>
+
+
+
+<section class="panel moves" id="moves" aria-labelledby="movesh">
+  <div class="hd"><h2 id="movesh">Roster moves seen this season</h2><span class="meta">From each Sleeper league\u2019s transaction log</span></div>
+  <div class="pad"><ul class="tight" id="movelist"></ul></div>
+</section>
+
+<section class="panel" aria-labelledby="advh">
+  <div class="hd"><h2 id="advh">Advanced stats</h2><span class="meta">Not on this page yet</span></div>
+  <div class="pad">
+    <p style="margin:0;max-width:70ch">Yards per route run, yards after contact, target share and targets per game are not shown on Sleeper or ESPN roster screens, and I did not have a source I could read them from, so none are listed here and no numbers are estimated. Yards per carry and receptions per game can be worked out from the stat lines already in each weekly view once you want them added.</p>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="srch">
+  <div class="hd"><h2 id="srch">Sources</h2></div>
+  <div class="pad">
+    <ul class="tight" style="--m:var(--ink3)">
+      <li>Scores, rosters and roster moves: the public <a href="https://docs.sleeper.com/">Sleeper API</a> for your three Sleeper leagues. Updated __UPDATED__.</li>
+      <li>NFL game stats: <a href="https://github.com/nflverse/nflverse-data">nflverse</a>. NFL schedule and college football box scores: ESPN's public scoreboard data.</li>
+      <li>The Eddie Pineiro (ESPN) team is entered by hand and is not part of the weekly refresh.</li>
+    </ul>
+  </div>
+</section>
+</div>
+<div id="view-legs" role="tabpanel" aria-labelledby="tab-legs" hidden>
+<div class="pad legintro"><h2 class="legh">PARLAY PAL</h2><p class="sub">Milestones players clear almost every week, across the NFL and Power 5 college football. NFL players on your teams are tagged.</p></div>
+<section class="panel" aria-labelledby="propsh">
+  <div class="hd"><h2 id="propsh">Every player, Weeks 1 to 5</h2><span class="meta" id="legcount"></span></div>
+  <div class="pad">
+    <div id="suggest" class="best"></div>
+    <div id="bestbets" class="best"></div>
+    <div class="pills" id="sportbar" role="group" aria-label="Sport"></div>
+    <div class="pills" id="legfilters" role="group" aria-label="Filter players"></div>
+    <div id="leglist"></div>
+    <p class="note" id="legnote" style="margin:12px 0 0">Covers every QB, RB, WR and TE in the NFL with at least 4 games played, using nflverse game stats. A milestone shows only if the player cleared it in 80% or more of his games, and each row shows the highest one that qualifies. These are stat milestones, not sportsbook lines, which I could not pull, so check the real number before you bet. Four or five games is a small sample.</p>
+  </div>
+</section>
+</div>
+</div>
+
+<script>
+/*CORE*/
+</script>
+<script>
+const $ = s => document.querySelector(s);
+const f2 = n => n == null ? '—' : (Math.round(n * 100) / 100).toFixed(2);
+const f1 = n => (Math.round(n * 10) / 10).toFixed(1);
+const weeksOf = t => Object.keys(t.weeks).map(Number).sort((a, b) => a - b);
+const lastWeek = t => Math.max(...weeksOf(t));
+const slotLabel = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', WRT: 'FLEX', WRTQ: 'SFLEX', K: 'K', DEF: 'D/ST' };
+const ACCENT = { eddie: 'var(--a-eddie)', redraft: 'var(--a-redraft)', mdyn: 'var(--a-mdyn)', dphi: 'var(--a-dphi)' };
+const SEASON_WEEKS = 18, THROUGH = __THROUGH__;
+
+let cur = { team: 'redraft', week: 5 };
+
+/*INSIGHTS*/
+
+function swaps(wk) {
+  const o = optimal(wk);
+  if (!o) return null;
+  const startNames = wk.s.map(x => x[1]);
+  const pickNames = o.picks.map(p => p[1]);
+  return {
+    o,
+    ins: o.picks.filter(p => !startNames.includes(p[1])),
+    outs: wk.s.filter(x => !pickNames.includes(x[1]))
+  };
+}
+
+function aggregate() {
+  let leak = 0, n = 0, big = { leak: -1, team: '', w: '' };
+  TEAMS.forEach(t => weeksOf(t).forEach(w => {
+    const s = weekSummary(t, w);
+    if (s.leak != null) {
+      leak += s.leak; n++;
+      if (s.leak > big.leak) big = { leak: s.leak, team: t.name, w };
+    }
+  }));
+  return { leak, n, big };
+}
+
+function renderHeader() {
+  const a = aggregate();
+  $('#score').innerHTML =
+    '<div><div class="n g">' + f1(a.leak) + '</div><div class="l">points left on benches across ' + a.n + ' team-weeks</div></div>' +
+    '<div><div class="n">' + f1(a.big.leak) + '</div><div class="l">biggest single miss: ' + a.big.team + ', Week ' + a.big.w + '</div></div>';
+  let t = '';
+  for (let i = 1; i <= SEASON_WEEKS; i++) t += '<i class="' + (i < THROUGH ? 'done' : i === THROUGH ? 'now' : '') + '"></i>';
+  $('#ticks').innerHTML = t;
+}
+
+function spark(team) {
+  const ws = weeksOf(team);
+  const vals = ws.map(w => startTotal(team.weeks[w]));
+  if (vals.length < 2) return '<div class="spark-empty">Only Week 1 on file</div>';
+  const W = 220, H = 58, px = 8, py = 8;
+  const hi = Math.max(...vals) * 1.08;
+  const x = i => px + (W - 2 * px) * i / (vals.length - 1);
+  const y = v => H - py - (H - 2 * py) * v / hi;
+  const pts = vals.map((v, i) => [x(i), y(v)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = line + ' L' + pts[pts.length - 1][0].toFixed(1) + ' ' + (H - py) + ' L' + pts[0][0].toFixed(1) + ' ' + (H - py) + ' Z';
+  const last = pts[pts.length - 1];
+  return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Starter points by week: ' + vals.map(f1).join(', ') + '">' +
+    '<line x1="' + px + '" x2="' + (W - px) + '" y1="' + (H - py) + '" y2="' + (H - py) + '" stroke="var(--line)" stroke-width="1"/>' +
+    '<path d="' + area + '" fill="var(--a)" fill-opacity=".16"/>' +
+    '<path d="' + line + '" fill="none" stroke="var(--a)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="4.5" fill="var(--a)" stroke="var(--panel)" stroke-width="2"/></svg>';
+}
+
+function renderCards() {
+  $('#cards').innerHTML = TEAMS.map(t => {
+    const ws = weeksOf(t);
+    const totals = ws.map(w => startTotal(t.weeks[w]));
+    const sum = totals.reduce((a, b) => a + b, 0);
+    let leak = 0, has = false;
+    ws.forEach(w => { const s = weekSummary(t, w); if (s.leak != null) { leak += s.leak; has = true; } });
+    const best = Math.max(...totals), bw = ws[totals.indexOf(best)];
+    return '<button class="tcard" style="--a:' + ACCENT[t.id] + '" data-team="' + t.id + '" aria-pressed="' + (t.id === cur.team) + '">' +
+      '<span><span class="tc-name">' + t.name + '</span><span class="tc-sub">' + t.platform + ' · ' + t.type + '</span></span>' +
+      '<span class="tc-big">' + f1(sum / ws.length) + '<small>avg per week</small></span>' +
+      spark(t) +
+      '<span class="tc-foot"><span>Left on bench <b class="g">' + (has ? f1(leak) : '—') + '</b></span><span>Best <b>W' + bw + '</b> ' + f1(best) + '</span></span></button>';
+  }).join('');
+  document.querySelectorAll('.tcard').forEach(b => b.onclick = () => {
+    cur.team = b.dataset.team;
+    cur.week = lastWeek(TEAMS.find(t => t.id === cur.team));
+    render();
+    try { $('#detail').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); } catch (e) {}
+  });
+}
+
+function renderMatrix() {
+  let h = '<thead><tr><th>Team</th>';
+  for (let w = 1; w <= 6; w++) h += '<th class="n">Wk ' + w + '</th>';
+  h += '<th class="n">Total</th><th class="n">Weeks over 10</th></tr></thead><tbody>';
+  TEAMS.forEach(t => {
+    let total = 0, over = 0, counted = 0;
+    h += '<tr><td><b>' + t.name + '</b><div class="muted" style="font-size:11.5px">' + t.platform + ' · ' + t.type + '</div></td>';
+    for (let w = 1; w <= 6; w++) {
+      const s = weekSummary(t, w);
+      if (!s || s.leak == null) { h += '<td class="c muted">—</td>'; continue; }
+      total += s.leak; counted++;
+      if (s.leak >= 10) over++;
+      const pct = Math.min(62, Math.round(s.leak * 1.7));
+      h += '<td class="c" style="background:color-mix(in srgb,var(--gold) ' + pct + '%,transparent)">' + f1(s.leak) + (t.weeks[w].partial ? '*' : '') + '</td>';
+    }
+    h += '<td class="c"><b>' + (counted ? f1(total) : '—') + '</b></td><td class="c">' + (counted ? over + ' of ' + counted : '—') + '</td></tr>';
+  });
+  $('#matrix').innerHTML = h + '</tbody>';
+}
+
+function topRound(x, y, w, h, r, fill) {
+  if (h <= 0) return '';
+  r = Math.min(r, w / 2, h);
+  return '<path d="M' + x + ' ' + (y + h) + 'V' + (y + r) + 'a' + r + ' ' + r + ' 0 0 1 ' + r + ' -' + r + 'H' + (x + w - r) + 'a' + r + ' ' + r + ' 0 0 1 ' + r + ' ' + r + 'V' + (y + h) + 'Z" fill="' + fill + '"/>';
+}
+
+function chartSVG(team) {
+  const ws = weeksOf(team);
+  const data = ws.map(w => weekSummary(team, w));
+  const maxV = Math.max(...data.map(d => d.start + (d.leak || 0)));
+  const top = Math.max(50, Math.ceil(maxV / 50) * 50);
+  const W = 400, H = 250, pl = 34, pr = 8, pt = 30, pb = 28;
+  const y = v => pt + (H - pt - pb) * (1 - v / top);
+  const step = (W - pl - pr) / ws.length;
+  const bw = Math.min(58, step * 0.64);
+  let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weekly starter points and points left on the bench for ' + team.name + '">';
+  for (let v = 0; v <= top; v += 50) {
+    s += '<line class="grid" x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
+    s += '<text x="' + (pl - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11">' + v + '</text>';
+  }
+  ws.forEach((w, i) => {
+    const d = data[i];
+    const cx = pl + step * i + step / 2, x = cx - bw / 2;
+    const tip = 'Week ' + w + ': ' + f1(d.start) + ' starters' + (d.leak != null ? ', ' + f1(d.leak) + ' left on bench' : '');
+    s += '<g class="b"><title>' + tip + '</title>';
+    const h0 = y(0) - y(d.start);
+    if (d.leak > 0) {
+      s += '<rect x="' + x + '" y="' + y(d.start) + '" width="' + bw + '" height="' + h0 + '" fill="var(--turf)"/>';
+      s += topRound(x, y(d.start + d.leak), bw, Math.max(0, (y(d.start) - y(d.start + d.leak)) - 2), 4, 'var(--gold)');
+      s += '<text class="leak" x="' + cx + '" y="' + (y(d.start + d.leak) - 6) + '" text-anchor="middle" font-size="11">+' + f1(d.leak) + '</text>';
+    } else {
+      s += topRound(x, y(d.start), bw, h0, 4, 'var(--turf)');
+    }
+    s += '<text class="val" x="' + cx + '" y="' + (y(d.start) + 16) + '" text-anchor="middle" font-size="12">' + f1(d.start) + '</text>';
+    s += '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="12">W' + w + (team.weeks[w].partial ? '*' : '') + '</text></g>';
+  });
+  return s + '</svg>';
+}
+
+function slotAverages(team) {
+  const acc = {};
+  weeksOf(team).forEach(w => {
+    const seen = {};
+    team.weeks[w].s.forEach(x => {
+      seen[x[0]] = (seen[x[0]] || 0) + 1;
+      (acc['' + x[0] + '#' + seen[x[0]]] = acc['' + x[0] + '#' + seen[x[0]]] || []).push(x[3]);
+    });
+  });
+  return Object.keys(acc).map(k => {
+    const vals = acc[k].filter(v => v != null);
+    const [slot, idx] = k.split('#');
+    const multi = Object.keys(acc).filter(q => q.startsWith(slot + '#')).length > 1;
+    return { label: slotLabel[slot] + (multi ? ' ' + idx : ''), avg: vals.reduce((a, b) => a + b, 0) / vals.length };
+  });
+}
+
+function prow(cls, slot, name, pos, pts, max, badge) {
+  const w = Math.max(0, Math.min(100, (pts || 0) / max * 100));
+  return '<li class="prow ' + cls + '"><span class="slot">' + slot + '</span>' +
+    '<span class="pn">' + name + '<i class="pp">' + pos + '</i>' + (badge || '') + '</span>' +
+    '<span class="pv' + (pts < 0 ? ' neg' : '') + '">' + (pts == null ? '—' : f2(pts)) + '</span>' +
+    '<span class="bar"><i style="width:' + w + '%"></i></span></li>';
+}
+
+function renderTeam() {
+  const team = TEAMS.find(t => t.id === cur.team);
+  const ws = weeksOf(team);
+  if (!team.weeks[cur.week]) cur.week = lastWeek(team);
+  const wk = team.weeks[cur.week];
+  const sum = weekSummary(team, cur.week);
+  const sw = swaps(wk);
+  let seasonLeak = 0, seasonStart = 0;
+  ws.forEach(w => { const q = weekSummary(team, w); seasonStart += q.start; if (q.leak != null) seasonLeak += q.leak; });
+
+  let h = '<div style="--a:' + ACCENT[team.id] + '">';
+  h += '<div class="dhead"><span class="dot"></span><div><h2>' + team.name + '</h2><div class="chips"><span class="chip">' + team.platform + '</span><span class="chip">' + team.type + '</span></div></div></div>';
+
+  h += '<div class="pills" role="group" aria-label="Week">';
+  for (let w = 1; w <= 6; w++) {
+    const has = !!team.weeks[w];
+    h += '<button class="pill" aria-pressed="' + (w === cur.week) + '" data-week="' + w + '"' + (has ? '' : ' disabled') + '>Wk ' + w + '</button>';
+  }
+  h += '</div>';
+
+  h += '<div class="stats">' +
+    '<div class="stat"><div class="k">Starters, Week ' + cur.week + '</div><div class="v">' + f1(sum.start) + '</div><div class="d">' + (wk.partial ? 'not final yet' : 'final') + '</div></div>' +
+    '<div class="stat"><div class="k">Best possible</div><div class="v">' + (sum.opt != null ? f1(sum.opt) : '—') + '</div><div class="d">' + (sum.opt != null ? 'from your active roster' : 'bench not captured') + '</div></div>' +
+    '<div class="stat"><div class="k">Left on bench</div><div class="v g">' + (sum.leak != null ? f1(sum.leak) : '—') + '</div><div class="d">this week</div></div>' +
+    '<div class="stat"><div class="k">Season so far</div><div class="v">' + f1(seasonStart) + '</div><div class="d">' + (seasonLeak ? f1(seasonLeak) + ' left on bench in ' + ws.length + ' weeks' : ws.length + ' week on file') + '</div></div></div>';
+
+  if (wk.note) h += '<div class="flag info"><div><b>Heads up:</b> ' + wk.note + '</div></div>';
+  if (sw && sw.ins.length) {
+    h += '<div class="flag"><div class="row"><span class="gain">+' + f1(sum.leak) + '</span><b>available in Week ' + cur.week + '</b></div>' +
+      '<div class="row"><span class="tag start">START</span>' + sw.ins.map(p => p[1] + ' (' + f1(p[2]) + ')').join(', ') + '</div>' +
+      '<div class="row"><span class="tag sit">SIT</span>' + sw.outs.map(x => x[1] + ' (' + f1(x[3] || 0) + ')').join(', ') + '</div></div>';
+  } else if (sw) {
+    h += '<div class="flag ok"><div><b>Lineup was already the best available.</b> Nothing on the bench would have beaten your starters.</div></div>';
+  }
+
+  h += '<div class="grid2"><section class="panel"><div class="hd"><h3>Weekly starters vs. best lineup</h3></div>' +
+    '<div class="legend"><span><i class="sw" style="background:var(--turf)"></i>Starter points</span><span><i class="sw" style="background:var(--gold)"></i>Left on bench</span></div>' +
+    chartSVG(team) + '<div class="pad note">Hover a bar for the numbers. Every score is also in the lists below.</div></section>';
+
+  if (ws.length > 1) {
+    const avgs = slotAverages(team);
+    const weakKeys = [...avgs].sort((a, b) => a.avg - b.avg).slice(0, 2).map(r => r.label);
+    const mx = Math.max(...avgs.map(r => r.avg));
+    h += '<section class="panel"><div class="hd"><h3>Average points by lineup slot</h3><span class="meta">Weeks 1 to ' + lastWeek(team) + '</span></div><div class="pad">' +
+      avgs.map(r => '<div class="srow' + (weakKeys.includes(r.label) ? ' weak' : '') + '"><span>' + r.label + '</span><span class="track"><i class="fill" style="width:' + Math.round(r.avg / mx * 100) + '%"></i></span><span class="num">' + f1(r.avg) + (weakKeys.includes(r.label) ? '<span class="lowest">lowest</span>' : '') + '</span></div>').join('') +
+      '</div></section>';
+  } else {
+    h += '<section class="panel"><div class="hd"><h3>Slot averages</h3></div><div class="pad note">Needs at least two weeks of data.</div></section>';
+  }
+  h += '</div>';
+
+  const all = wk.s.map(x => x[3] || 0).concat((wk.b || []).map(x => x[2] || 0));
+  const max = Math.max(20, ...all);
+  const outNames = sw ? sw.outs.map(x => x[1]) : [];
+  const inNames = sw ? sw.ins.map(p => p[1]) : [];
+  h += '<div class="grid2"><section class="panel"><div class="hd"><h3>Starters</h3><span class="meta">Week ' + cur.week + ' · same scale as bench</span></div><ul class="plist">' +
+    wk.s.map(x => prow(outNames.includes(x[1]) ? 'out' : '', slotLabel[x[0]], x[1], x[2], x[3], max, outNames.includes(x[1]) ? '<span class="badge out">▼ bench was better</span>' : '')).join('') + '</ul></section>';
+  if (wk.b) {
+    const bench = [...wk.b].sort((a, b) => (b[2] || 0) - (a[2] || 0));
+    h += '<section class="panel"><div class="hd"><h3>Bench</h3><span class="meta">Best first</span></div><ul class="plist">' +
+      bench.map(x => prow(inNames.includes(x[0]) ? 'in' : 'bn', 'BN', x[0], x[1], x[2], max, inNames.includes(x[0]) ? '<span class="badge in">▲ should have started</span>' : '')).join('') +
+      '</ul><div class="pad note">A dash means no score was listed yet.</div></section>';
+  } else {
+    h += '<section class="panel"><div class="hd"><h3>Bench</h3></div><div class="pad note">The bench was cut off in the screenshot, so there is nothing to compare for this week.</div></section>';
+  }
+  h += '</div>';
+
+  const ins = INSIGHTS[team.id];
+  h += '<div class="grid2"><section class="panel"><div class="hd"><h3>What keeps repeating</h3></div><div class="pad"><ul class="tight">' + ins.weak.map(x => '<li>' + x + '</li>').join('') + '</ul></div></section>' +
+    '<section class="panel moves"><div class="hd"><h3>Moves to consider</h3></div><div class="pad"><ul class="tight">' + ins.moves.map(x => '<li>' + x + '</li>').join('') + '</ul><p class="note" style="margin:12px 0 0">Ideas come from your rosters’ scoring. I could not check current trade values or who is available in each league, so confirm before offering.</p></div></section></div>';
+  h += '</div>';
+
+  $('#detail').innerHTML = h;
+  document.querySelectorAll('.pill:not([disabled])').forEach(b => b.onclick = () => { cur.week = Number(b.dataset.week); renderTeam(); });
+}
+
+function render() { renderCards(); renderTeam(); }
+renderHeader();
+renderMatrix();
+$('#movelist').innerHTML = MOVES.map(m => '<li>' + m[0] + '</li>').join('');
+render();
+</script>
+<script>
+(function(){var m=document.getElementById('view-main'),l=document.getElementById('view-legs'),bm=document.getElementById('tab-main'),bl=document.getElementById('tab-legs');
+function show(w){var legs=w==='legs';m.hidden=legs;l.hidden=!legs;bm.setAttribute('aria-selected',!legs);bl.setAttribute('aria-selected',legs);try{location.hash=legs?'legs':''}catch(e){}}
+bm.onclick=function(){show('main')};bl.onclick=function(){show('legs')};
+if(location.hash==='#legs')show('legs');})();
+</script>
+<!--PARLAY-->
+
+
+
+
+
+
+
+
