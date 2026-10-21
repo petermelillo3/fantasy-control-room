@@ -202,9 +202,10 @@ def sleeper_team(tid, name, typ, label, lid, players, state):
             txs += gj(SL + 'league/%s/transactions/%d' % (lid, rnd))
         except Exception:
             break
+    season_start = dt.datetime(int(state['season']), 8, 1, tzinfo=ET).timestamp() * 1000
     seen, lines = set(), []
     for t in sorted(txs, key=lambda x: x.get('created', 0)):
-        if t.get('status') != 'complete' or rid not in (t.get('roster_ids') or []):
+        if t.get('status') != 'complete' or rid not in (t.get('roster_ids') or []) or t.get('created', 0) < season_start:
             continue
         if t['transaction_id'] in seen:
             continue
