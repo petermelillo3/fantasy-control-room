@@ -679,6 +679,8 @@ def start_sit(res, players, ctx):
         if not match:
             continue
         outs.remove(match)
+        if i['score'] - match['score'] <= 0.05:
+            continue
         why = ('%s is %s' % (match['name'], match['flag'] if match['flag'] != 'bye' else 'on a bye')) if match['flag'] else \
             ('%s projects %.1f vs %.1f' % (i['name'], i['score'], match['score']))
         changes.append({'start': i['name'], 'sit': match['name'], 'gain': round(i['score'] - match['score'], 1), 'why': why})
