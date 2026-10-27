@@ -73,6 +73,7 @@ def with_cache(name, fn):
 
 # ----------------------------------------------------------------- Sleeper
 SL = 'https://api.sleeper.app/v1/'
+SLP = 'https://api.sleeper.com/'
 USER = 'pmelillo3'
 LEAGUES = [
     ('redraft', 'Melillo Redraft', 'Redraft', 'Redraft', '1385446563223973888'),
@@ -234,9 +235,11 @@ def sleeper_team(tid, name, typ, label, lid, players, state):
     record = '%s-%s%s' % (st.get('wins', 0), st.get('losses', 0), ('-%s' % st['ties']) if st.get('ties') else '')
     moves = '<b>%s</b> (%s)' % (name, record)
     moves += ''.join('<br>' + l for l in lines) if lines else ': no roster moves yet'
+    rec = ((league.get('scoring_settings') or {}).get('rec')) or 0
     return {
         'team': team, 'moves': moves, 'pos_count': pos_count, 'slots': slots,
         'keys': all_keys, 'label': label, 'record': record,
+        'roster': {'active': active, 'starters': [x for x in (mine.get('starters') or []) if x not in (None, '0')], 'rec': rec},
     }
 
 
@@ -300,10 +303,19 @@ def nfl_state():
     return gj(SL + 'state/nfl')
 
 
+_NFLV = {}
+
+
+def load_nflverse(season):
+    if season not in _NFLV:
+        url = 'https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_%s.csv' % season
+        _NFLV[season] = pd.read_csv(io.BytesIO(get(url).content))
+    return _NFLV[season].copy()
+
+
 def nfl_legs(state, own):
     season = state['season']
-    url = 'https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_%s.csv' % season
-    d = pd.read_csv(io.BytesIO(get(url).content))
+    d = load_nflverse(season)
     d = d[(d.season_type == 'REG') & d.position.isin(['QB', 'RB', 'WR', 'TE'])].copy()
     max_week = int(d.week.max())
     d['tot'] = d.rushing_yards + d.receiving_yards
@@ -558,6 +570,132 @@ def college(state):
 
 
 # ------------------------------------------------------------------- build
+OUT_STATUS = {'Out', 'IR', 'PUP', 'Sus', 'Suspended', 'NA', 'COV'}
+FX = {'LAR': 'LA', 'WSH': 'WAS', 'JAC': 'JAX'}
+
+
+def start_context(state):
+    """Upcoming week, opponents, matchup ranks and Sleeper projections (all best effort)."""
+    season = int(state['season'])
+    d = load_nflverse(season)
+    d = d[(d.season_type == 'REG') & d.position.isin(['QB', 'RB', 'WR', 'TE'])]
+    max_week = int(d.week.max()) if len(d) else 0
+    nxt = max(int(state['week']), max_week + 1)
+    ctx = {'week': nxt, 'opp': {}, 'rank': {}, 'proj': {}, 'sched': False}
+    try:
+        sb = gj('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=%d' % nxt)
+        for e in sb.get('events', []):
+            cs = e['competitions'][0]['competitors']
+            t = [FX.get(c['team']['abbreviation'], c['team']['abbreviation']) for c in cs]
+            if len(t) == 2:
+                ctx['opp'][t[0]], ctx['opp'][t[1]] = t[1], t[0]
+        ctx['sched'] = bool(ctx['opp'])
+    except Exception as ex:
+        log('start/sit schedule unavailable:', ex)
+    try:
+        g = d.groupby(['position', 'opponent_team', 'week']).fantasy_points_ppr.sum().reset_index()
+        g = g.groupby(['position', 'opponent_team']).fantasy_points_ppr.mean()
+        for pos in ['QB', 'RB', 'WR', 'TE']:
+            ser = g[pos].sort_values(ascending=False)  # most points allowed first = softest
+            ctx['rank'][pos] = {FX.get(t, t): i + 1 for i, t in enumerate(ser.index)}
+    except Exception as ex:
+        log('start/sit matchup ranks unavailable:', ex)
+    try:
+        url = SLP + 'projections/nfl/%s/%d?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF' % (season, nxt)
+        for row in gj(url):
+            st = row.get('stats') or {}
+            if st:
+                ctx['proj'][str(row['player_id'])] = st
+    except Exception as ex:
+        log('start/sit projections unavailable:', ex)
+    return ctx
+
+
+def start_sit(res, players, ctx):
+    ro = res['roster']
+    rec = ro['rec']
+    key = 'pts_ppr' if rec >= 1 else 'pts_half_ppr' if rec >= 0.5 else 'pts_std'
+    recent = {}
+    for w in sorted(res['team']['weeks'], key=int):
+        wk = res['team']['weeks'][w]
+        for x in wk['s']:
+            recent.setdefault((x[1], x[2]), []).append(x[3])
+        for x in wk['b']:
+            recent.setdefault((x[0], x[1]), []).append(x[2])
+    cands = {}
+    for pid in ro['active']:
+        p = players.p.get(pid) or {}
+        nm, pos = players.info(pid)
+        if pos not in ELIG['WRTQ'] + ['K', 'DEF']:
+            continue
+        team = FX.get(p.get('team') or (pid if pos == 'DEF' else ''), p.get('team') or (pid if pos == 'DEF' else ''))
+        inj = p.get('injury_status') or ''
+        opp = ctx['opp'].get(team)
+        bye = ctx['sched'] and team and opp is None
+        st = ctx['proj'].get(pid) or {}
+        if key in st:
+            base, src = float(st[key]), 'proj'
+        else:
+            h = (recent.get((nm, pos)) or [])[-3:]
+            base, src = (sum(h) / len(h) if h else 0.0), 'avg'
+        adj, tag = base, ''
+        rk = (ctx['rank'].get(pos) or {}).get(opp)
+        if rk and pos in ('QB', 'RB', 'WR', 'TE'):
+            if rk <= 8:
+                adj, tag = base * 1.05, 'soft'
+            elif rk >= 25:
+                adj, tag = base * 0.95, 'tough'
+        flag = ''
+        if bye:
+            adj, flag = 0.0, 'bye'
+        elif inj in OUT_STATUS:
+            adj, flag = 0.0, inj
+        elif inj in ('Doubtful',):
+            adj, flag = adj * 0.4, 'Doubtful'
+        elif inj == 'Questionable':
+            adj, flag = adj * 0.9, 'Questionable'
+        cands[pid] = {'pid': pid, 'name': nm, 'pos': pos, 'score': adj, 'proj': round(base, 1), 'src': src,
+                      'opp': opp or ('BYE' if bye else ''), 'tag': tag, 'flag': flag}
+    used, lineup = set(), []
+    for sl in ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'WRT', 'WRTQ']:
+        for _ in [x for x in res['slots'] if x == sl]:
+            best = None
+            for pid, c in cands.items():
+                if pid in used or c['pos'] not in ELIG[sl]:
+                    continue
+                if best is None or c['score'] > cands[best]['score']:
+                    best = pid
+            if best:
+                used.add(best)
+                lineup.append((sl, cands[best]))
+    cur = set(ro['starters'])
+    rows = [[sl, c['name'], c['pos'], c['proj'], round(c['score'], 1), c['opp'], c['tag'], c['flag'], 'in' if c['pid'] not in cur else ''] for sl, c in lineup]
+    changes = []
+    ins = [c for _, c in lineup if c['pid'] not in cur]
+    outs = [cands[p] for p in cur if p in cands and p not in used]
+    for i in sorted(ins, key=lambda c: -c['score']):
+        match = next((o for o in sorted(outs, key=lambda o: o['score']) if o['pos'] == i['pos']), None) or \
+            (min(outs, key=lambda o: o['score']) if outs else None)
+        if not match:
+            continue
+        outs.remove(match)
+        why = ('%s is %s' % (match['name'], match['flag'] if match['flag'] != 'bye' else 'on a bye')) if match['flag'] else \
+            ('%s projects %.1f vs %.1f' % (i['name'], i['score'], match['score']))
+        changes.append({'start': i['name'], 'sit': match['name'], 'gain': round(i['score'] - match['score'], 1), 'why': why})
+    # close calls: best bench player vs the weakest starter who could be replaced by him
+    bench = []
+    for pid, c in sorted(cands.items(), key=lambda kv: -kv[1]['score']):
+        if pid in used:
+            continue
+        sl_scores = [x[1]['score'] for x in lineup if x[1]['pos'] == c['pos'] or (x[0] in ('WRT', 'WRTQ') and c['pos'] in ELIG[x[0]])]
+        low = min(sl_scores) if sl_scores else None
+        close = low is not None and low - c['score'] <= 1.5
+        bench.append([c['name'], c['pos'], c['proj'], round(c['score'], 1), c['flag'] or ('close call' if close else '')])
+    warn = [x[1] + ' (' + x[7] + ')' for x in rows if x[7]]
+    return {'week': ctx['week'], 'lineup': rows, 'changes': changes, 'bench': bench[:8], 'warn': warn,
+            'source': 'Sleeper projections' if any(c['src'] == 'proj' for c in cands.values()) else 'recent average'}
+
+
 def read(name):
     with open(os.path.join(ROOT, name), encoding='utf-8') as f:
         return f.read()
@@ -576,6 +714,18 @@ def main():
             results.append(r)
     with open(os.path.join(DATA, 'eddie.json')) as f:
         eddie = json.load(f)
+
+    start = {}
+    try:
+        ctx = start_context(state)
+        for r in results:
+            start[r['team']['id']] = with_cache('start_' + r['team']['id'], lambda r=r: start_sit(r, players, ctx))
+    except Exception as ex:
+        log('start/sit skipped:', ex)
+        for r in results:
+            c = cache_path('start_' + r['team']['id'])
+            if os.path.exists(c):
+                start[r['team']['id']] = json.load(open(c))
 
     teams = [eddie] + [r['team'] for r in results]
     insights = {'eddie': {
@@ -600,7 +750,7 @@ def main():
     through = max([int(w) for t in teams for w in t['weeks']] or [1])
 
     core = read('core_head.js') + 'const TEAMS = ' + json.dumps(teams, separators=(',', ':')) + ';\n\n' + read('core_tail.js')
-    ins = 'const INSIGHTS = ' + json.dumps(insights) + ';\nconst MOVES = ' + json.dumps(moves) + ';\n'
+    ins = 'const INSIGHTS = ' + json.dumps(insights) + ';\nconst MOVES = ' + json.dumps(moves) + ';\nconst START = ' + json.dumps(start) + ';\n'
     meta = {'nflWeek': (nfl or {}).get('week', through), 'cfbThrough': (cfb or {}).get('through', '')}
     parlay = read('parlay.js').replace('__N__', json.dumps((nfl or {}).get('rows', []), separators=(',', ':'))) \
         .replace('__C__', json.dumps((cfb or {}).get('rows', []), separators=(',', ':'))) \

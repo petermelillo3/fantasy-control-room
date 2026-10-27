@@ -518,6 +518,24 @@ function renderTeam() {
   }
   h += '</div>';
 
+  const ss = (typeof START !== 'undefined') && START[team.id];
+  if (ss && ss.lineup && ss.lineup.length) {
+    const tg = x => x[6] ? ' <span class="note">(' + (x[6] === 'soft' ? 'soft matchup' : 'tough matchup') + ')</span>' : '';
+    const fl = x => x[7] ? ' <b style="color:var(--bad,#b3261e)">' + (x[7] === 'bye' ? 'BYE' : x[7]) + '</b>' : '';
+    h += '<section class="panel"><div class="hd"><h3>Who to start: Week ' + ss.week + '</h3></div><div class="pad">';
+    if (ss.changes.length) {
+      h += '<ul class="tight">' + ss.changes.map(c => '<li><b>Start ' + c.start + ' over ' + c.sit + '</b> (+' + c.gain + ' projected). ' + c.why + '.</li>').join('') + '</ul>';
+    } else {
+      h += '<p style="margin:0 0 10px"><b>Your current lineup is already the best one I can build.</b> No changes suggested.</p>';
+    }
+    if (ss.warn && ss.warn.length) h += '<p class="note" style="margin:8px 0">Check status before kickoff: ' + ss.warn.join(', ') + '.</p>';
+    h += '<table class="mx" style="width:100%"><thead><tr><th style="text-align:left">Slot</th><th style="text-align:left">Player</th><th>Opp</th><th>Proj</th></tr></thead><tbody>' +
+      ss.lineup.map(x => '<tr><td style="text-align:left">' + x[0] + '</td><td style="text-align:left">' + x[1] + (x[8] ? ' <b>(move in)</b>' : '') + tg(x) + fl(x) + '</td><td>' + (x[5] || '-') + '</td><td>' + x[4].toFixed(1) + '</td></tr>').join('') +
+      '</tbody></table>';
+    if (ss.bench.length) h += '<p class="note" style="margin:10px 0 0"><b>Bench, best first:</b> ' + ss.bench.map(b => b[0] + ' ' + b[3].toFixed(1) + (b[4] ? ' (' + b[4] + ')' : '')).join(', ') + '.</p>';
+    h += '<p class="note" style="margin:10px 0 0">Built from ' + ss.source + ', trimmed 5% for a tough matchup and raised 5% for a soft one (by points each defense gives that position), and cut for injury tags. Refreshes with the weekly update, so re-check Sunday morning inactives.</p></div></section>';
+  }
+
   const ins = INSIGHTS[team.id];
   h += '<div class="grid2"><section class="panel"><div class="hd"><h3>What keeps repeating</h3></div><div class="pad"><ul class="tight">' + ins.weak.map(x => '<li>' + x + '</li>').join('') + '</ul></div></section>' +
     '<section class="panel moves"><div class="hd"><h3>Moves to consider</h3></div><div class="pad"><ul class="tight">' + ins.moves.map(x => '<li>' + x + '</li>').join('') + '</ul><p class="note" style="margin:12px 0 0">Ideas come from your rosters’ scoring. I could not check current trade values or who is available in each league, so confirm before offering.</p></div></section></div>';
