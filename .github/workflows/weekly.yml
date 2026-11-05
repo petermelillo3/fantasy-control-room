@@ -26,6 +26,7 @@ jobs:
       - run: pip install pandas requests
       - run: python build.py
         env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'pp-683d1c80f045' }}
       - name: Commit changes
         run: |

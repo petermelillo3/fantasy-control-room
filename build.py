@@ -772,6 +772,160 @@ def make_parlays(nfl):
     return out
 
 
+STAT_COL = {'pass yds': 'passing_yards', 'pass TDs': 'passing_tds', 'rush yds': 'rushing_yards', 'rec': 'receptions',
+            'rec yds': 'receiving_yards', 'rush + rec yds': 'tot', 'TD': 'td'}
+# The Odds API market for each milestone type
+ODDS_MKT = {'pass yds': 'player_pass_yds', 'pass TDs': 'player_pass_tds', 'rush yds': 'player_rush_yds', 'rec': 'player_receptions',
+            'rec yds': 'player_reception_yds', 'rush + rec yds': 'player_rush_reception_yds', 'TD': 'player_anytime_td'}
+
+
+def parse_leg(m):
+    th, label = m.split('+ ', 1)
+    return int(th), label
+
+
+def model_prob(l):
+    """Hit rate shrunk toward the middle (add one hit and one miss), nudged 4 points for a soft or tough matchup."""
+    p = (l['h'] + 1.0) / (l['n'] + 2.0)
+    p += {'soft': 0.04, 'tough': -0.04}.get(l['g'], 0)
+    return round(min(0.95, max(0.05, p)), 3)
+
+
+def implied(odds):
+    return round(100.0 / (odds + 100.0) if odds > 0 else -odds / (-odds + 100.0), 3)
+
+
+def fetch_lines(parlays):
+    """{(player lower, market text): {'odds','book','point'}} from data/lines.json plus The Odds API when ODDS_API_KEY is set."""
+    out = {}
+    try:
+        for r in json.load(open(os.path.join(DATA, 'lines.json'))):
+            out[(r['p'].lower(), r['m'])] = {'odds': int(r['odds']), 'book': r.get('book', 'manual'), 'point': r.get('point')}
+    except Exception:
+        pass
+    key = os.environ.get('ODDS_API_KEY')
+    if not key:
+        return out
+    now = dt.datetime.now(dt.timezone.utc)
+    soon = [x for x in parlays if x['legs'] and dt.timedelta(0) < dt.datetime.fromisoformat(x['kick'].replace('Z', '+00:00')) - now <= dt.timedelta(hours=26)]
+    if not soon:
+        return out
+    base = 'https://api.the-odds-api.com/v4/sports/americanfootball_nfl/'
+    try:
+        events = gj(base + 'events?apiKey=%s' % key)
+    except Exception as ex:
+        log('odds events failed:', ex)
+        return out
+    legs = [l for x in soon for l in x['legs']]
+    teams = {l['tm'] for l in legs} | {l['opp'] for l in legs}
+    for ev in events:
+        kick = dt.datetime.fromisoformat(ev['commence_time'].replace('Z', '+00:00'))
+        if not (dt.timedelta(0) < kick - now <= dt.timedelta(hours=26)):
+            continue
+        mk = sorted({ODDS_MKT[parse_leg(l['m'])[1]] for l in legs})
+        try:
+            data = gj(base + 'events/%s/odds?apiKey=%s&regions=us&markets=%s&oddsFormat=american' % (ev['id'], key, ','.join(mk)))
+        except Exception as ex:
+            log('odds failed for event', ev.get('id'), ex)
+            continue
+        inv = {v: k for k, v in ODDS_MKT.items()}
+        for b in data.get('bookmakers', []):
+            for mkt in b.get('markets', []):
+                label = inv.get(mkt['key'])
+                for o in mkt.get('outcomes', []):
+                    who = (o.get('description') or '').lower()
+                    for l in legs:
+                        th, lab = parse_leg(l['m'])
+                        if lab != label or l['p'].lower() != who:
+                            continue
+                        if label == 'TD':
+                            if o.get('name') != 'Yes':
+                                continue
+                            pt = 0.5
+                        else:
+                            if o.get('name') != 'Over':
+                                continue
+                            pt = o.get('point')
+                        # keep the best price among books for the line closest to our milestone
+                        want = th - 0.5
+                        k = (who, l['m'])
+                        cand = {'odds': int(o['price']), 'book': b['title'], 'point': pt}
+                        cur = out.get(k)
+                        d_new, d_cur = abs((pt or 0) - want), abs(((cur or {}).get('point') or 0) - want) if cur else 9e9
+                        if cur is None or d_new < d_cur or (d_new == d_cur and cand['odds'] > cur['odds']):
+                            out[k] = cand
+    return out
+
+
+def grade_legs(nfl_state_week, season):
+    """Grade stored picks from finished weeks against nflverse; return record summary."""
+    pp = os.path.join(DATA, 'picks.json')
+    try:
+        picks = json.load(open(pp))
+    except Exception:
+        picks = []
+    try:
+        d = load_nflverse(season)
+        d = d[d.season_type == 'REG'].copy()
+        d['tot'] = d.rushing_yards + d.receiving_yards
+        d['td'] = d.rushing_tds + d.receiving_tds
+        for x in picks:
+            if x.get('res') is not None:
+                continue
+            row = d[(d.week == x['week']) & (d.player_display_name == x['p'])]
+            if row.empty:
+                continue
+            th, lab = parse_leg(x['m'])
+            x['res'] = int(float(row[STAT_COL[lab]].iloc[0]) >= th)
+        json.dump(picks, open(pp, 'w'), separators=(',', ':'))
+    except Exception as ex:
+        log('grading skipped:', ex)
+    done = [x for x in picks if x.get('res') is not None]
+    lined = [x for x in done if x.get('odds') is not None]
+    return {'n': len(done), 'hit': sum(x['res'] for x in done), 'exp': round(sum(x['prob'] for x in done), 1),
+            'pending': len(picks) - len(done), 'lined': len(lined)}
+
+
+def attach_lines(parlays, week):
+    lines = fetch_lines(parlays)
+    hp = os.path.join(DATA, 'line_history.json')
+    try:
+        hist = json.load(open(hp))
+    except Exception:
+        hist = {}
+    pp = os.path.join(DATA, 'picks.json')
+    try:
+        picks = json.load(open(pp))
+    except Exception:
+        picks = []
+    have = {(x['week'], x['p'], x['m']) for x in picks}
+    stamp = dt.datetime.now(ET).strftime('%b %d %I:%M %p')
+    for x in parlays:
+        for l in x['legs']:
+            l['prob'] = model_prob(l)
+            ln = lines.get((l['p'].lower(), l['m']))
+            if ln:
+                imp = implied(ln['odds'])
+                edge = round(l['prob'] - imp, 3)
+                l.update({'odds': ln['odds'], 'book': ln['book'], 'imp': imp, 'edge': edge,
+                          'pt': ln.get('point'), 'v': 'value' if edge >= 0.05 else ('poor' if edge <= -0.05 else 'fair')})
+                h = hist.setdefault(l['p'] + '|' + l['m'], [])
+                if not h or h[-1][1] != ln['odds']:
+                    h.append([stamp, ln['odds']])
+                l['hist'] = h[-6:]
+            k = (week, l['p'], l['m'])
+            if k not in have:
+                picks.append({'week': week, 'p': l['p'], 'm': l['m'], 'prob': l['prob'], 'odds': l.get('odds'), 'res': None})
+                have.add(k)
+            else:
+                for q in picks:
+                    if (q['week'], q['p'], q['m']) == k and q.get('odds') is None and l.get('odds') is not None:
+                        q['odds'] = l['odds']
+    json.dump(hist, open(hp, 'w'), separators=(',', ':'))
+    json.dump(picks, open(pp, 'w'), separators=(',', ':'))
+    return bool(lines)
+
+
 def notify(parlays):
     """Push each parlay to the phone once, shortly before kickoff (ntfy.sh topic from NTFY_TOPIC)."""
     topic = os.environ.get('NTFY_TOPIC')
@@ -851,13 +1005,30 @@ def main():
 
     nfl = with_cache('nfl', lambda: nfl_legs(state, own))
     cfb = with_cache('college', lambda: college(state))
-    parlays = with_cache('parlays', lambda: make_parlays(nfl)) or []
+    parlays = make_parlays(nfl) if nfl else []
+    if parlays:
+        try:
+            attach_lines(parlays, int(nfl.get('next', 0)))
+        except Exception as ex:
+            log('line check failed:', ex)
+        with open(cache_path('parlays'), 'w') as f:
+            json.dump(parlays, f, separators=(',', ':'))
+    else:
+        try:
+            parlays = json.load(open(cache_path('parlays')))
+        except Exception:
+            parlays = []
+    try:
+        record = grade_legs(int(state['week']), int(state['season']))
+    except Exception as ex:
+        log('record failed:', ex)
+        record = {'n': 0, 'hit': 0, 'exp': 0, 'pending': 0, 'lined': 0}
     if os.environ.get('NTFY_TOPIC'):
         notify(parlays)
     through = max([int(w) for t in teams for w in t['weeks']] or [1])
 
     core = read('core_head.js') + 'const TEAMS = ' + json.dumps(teams, separators=(',', ':')) + ';\n\n' + read('core_tail.js')
-    ins = 'const INSIGHTS = ' + json.dumps(insights) + ';\nconst MOVES = ' + json.dumps(moves) + ';\nconst START = ' + json.dumps(start) + ';\nconst PARLAYS = ' + json.dumps(parlays) + ';\n'
+    ins = 'const INSIGHTS = ' + json.dumps(insights) + ';\nconst MOVES = ' + json.dumps(moves) + ';\nconst START = ' + json.dumps(start) + ';\nconst PARLAYS = ' + json.dumps(parlays) + ';\nconst RECORD = ' + json.dumps(record) + ';\n'
     meta = {'nflWeek': (nfl or {}).get('week', through), 'cfbThrough': (cfb or {}).get('through', '')}
     parlay = read('parlay.js').replace('__N__', json.dumps((nfl or {}).get('rows', []), separators=(',', ':'))) \
         .replace('__C__', json.dumps((cfb or {}).get('rows', []), separators=(',', ':'))) \

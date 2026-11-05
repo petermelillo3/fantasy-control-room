@@ -286,7 +286,7 @@
 <div class="pad legintro"><h2 class="legh">PARLAY PAL</h2><p class="sub">Milestones players clear almost every week, across the NFL and Power 5 college football. NFL players on your teams are tagged.</p></div>
 <section class="panel" aria-labelledby="slateh">
   <div class="hd"><h2 id="slateh">Parlays for every primetime game and slate</h2><span class="meta" id="slatemeta"></span></div>
-  <div class="pad"><div class="sgrid" id="slategrid"></div>
+  <div class="pad"><div id="linecheck" class="best"></div><div class="sgrid" id="slategrid"></div>
   <p class="note" style="margin:12px 0 0">Made automatically each week from the same hit rates and matchup tags as below. Primetime games get up to three legs from either team. The Sunday 1 PM and 4 PM slates get one leg per game. A phone notification goes out before kickoff. These are stat milestones, not sportsbook lines, so check each line and price first. Not betting advice.</p></div>
 </section>
 <section class="panel" aria-labelledby="propsh">
@@ -591,7 +591,24 @@ function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp
 var P=PARLAYS.filter(function(x){return x.legs&&x.legs.length});
 document.getElementById('slatemeta').textContent=P.length?P.length+' parlays this week':'';
 function when(k){try{return new Date(k).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' ET'}catch(e){return ''}}
-g.innerHTML=P.length?P.map(function(x){return '<div class="sg"><b class="sgt">'+esc(x.title)+'</b><span class="note">'+when(x.kick)+'</span><ul class="bbl1" style="margin-top:8px">'+x.legs.map(function(l){return '<li><b>'+esc(l.p)+'</b> <span class="note">'+esc(l.tm)+(l.ha==='@'?' at ':' vs ')+esc(l.opp)+'</span><br>'+esc(l.m)+' <span class="hit">'+l.h+'/'+l.n+'</span> <span class="mu '+l.g+'">'+(l.g==='soft'?'Soft':'Even')+'</span></li>'}).join('')+'</ul></div>'}).join(''):'<p class="note">No parlays yet this week. They appear once the schedule and game logs are loaded.</p>';
+function od(o){return (o>0?'+':'')+o}
+function pc(x){return Math.round(x*100)+'%'}
+function line(l){if(l.odds==null)return '<span class="note">Model '+pc(l.prob)+' · no line posted yet</span>';
+var e=Math.round(l.edge*100),lab=l.v==='value'?'Value':(l.v==='poor'?'Poor line':'Fair');
+return '<span class="note">Model '+pc(l.prob)+' · '+esc(l.book)+' '+od(l.odds)+' ('+pc(l.imp)+')'+(l.pt!=null&&l.pt!==0.5?' at '+l.pt:'')+'</span> <span class="mu '+(l.v==='value'?'soft':(l.v==='poor'?'tough':'mid'))+'">'+lab+' '+(e>0?'+':'')+e+'</span>'+(l.hist&&l.hist.length>1?'<span class="note"> · moved '+l.hist.map(function(h){return od(h[1])}).join(' → ')+'</span>':'')}
+g.innerHTML=P.length?P.map(function(x){return '<div class="sg"><b class="sgt">'+esc(x.title)+'</b><span class="note">'+when(x.kick)+'</span><ul class="bbl1" style="margin-top:8px">'+x.legs.map(function(l){return '<li><b>'+esc(l.p)+'</b> <span class="note">'+esc(l.tm)+(l.ha==='@'?' at ':' vs ')+esc(l.opp)+'</span><br>'+esc(l.m)+' <span class="hit">'+l.h+'/'+l.n+'</span> <span class="mu '+l.g+'">'+(l.g==='soft'?'Soft':'Even')+'</span><br>'+line(l)+'</li>'}).join('')+'</ul></div>'}).join(''):'<p class="note">No parlays yet this week. They appear once the schedule and game logs are loaded.</p>';
+var all=[];P.forEach(function(x){x.legs.forEach(function(l){if(l.odds!=null)all.push(l)})});
+var poor=all.filter(function(l){return l.v==='poor'}),val=all.filter(function(l){return l.v==='value'});
+var lc=document.getElementById('linecheck');
+if(lc){var h='<h3 class="bbh">Line check</h3>';
+if(!all.length){h+='<p style="margin:0 0 6px">No lines are loaded yet, so there is nothing to compare with the model. Lines load automatically once an odds API key is added to the repo (secret <b>ODDS_API_KEY</b>), or you can list them by hand in <b>data/lines.json</b> as {"p":"Zay Flowers","m":"5+ rec","odds":-130,"book":"DraftKings"}.</p>';}
+else{h+='<p style="margin:0 0 6px">'+all.length+' legs have a posted line. <b>'+val.length+'</b> look like value against the model and <b>'+poor.length+'</b> are poor lines.</p>';
+if(poor.length)h+='<p class="note" style="margin:0 0 4px"><b>Poor lines (price is shorter than the model says it should be):</b> '+poor.map(function(l){return esc(l.p)+' '+esc(l.m)+' '+od(l.odds)}).join('; ')+'.</p>';
+if(val.length)h+='<p class="note" style="margin:0 0 4px"><b>Value:</b> '+val.map(function(l){return esc(l.p)+' '+esc(l.m)+' '+od(l.odds)}).join('; ')+'.</p>';}
+if(typeof RECORD!=='undefined'&&RECORD.n)h+='<p class="note" style="margin:6px 0 0"><b>Model record:</b> '+RECORD.hit+' of '+RECORD.n+' graded legs hit (the model expected about '+RECORD.exp+'). '+RECORD.pending+' still waiting on games.</p>';
+else if(typeof RECORD!=='undefined')h+='<p class="note" style="margin:6px 0 0">Model record starts once this week\u2019s legs are graded: each leg is saved and checked against the box score after the game.</p>';
+h+='<p class="note" style="margin:6px 0 0">Model chance = the leg\u2019s hit rate (with one extra hit and one extra miss added so small samples are not overconfident), plus 4 points for a soft matchup or minus 4 for a tough one. A line is Value when the model beats the price by 5 points or more, Poor when it trails by 5 or more. It does not know injuries, weather or game script, so it is a screen, not a forecast.</p>';
+lc.innerHTML=h;}
 })();
 </script>
 <script>
