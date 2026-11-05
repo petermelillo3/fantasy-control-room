@@ -35,6 +35,24 @@
     --a-eddie:#2f6fae; --a-redraft:#2f7a4d; --a-mdyn:#b07d00; --a-dphi:#7a4fb8;
     color-scheme:light;
   }
+
+  /* the office: one clickable room, each desk is a team */
+  :root{--wall:#1b2620;--wall2:#223028;--floor:#10171380;--floor2:#0f1512;--deskc:#3a2f24;--deskt:#6b5640;--glass:#2c4a5a;--screen:#0a0f0d}
+  @media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--wall:#dfe8e1;--wall2:#cfdcd2;--floor:#b9a88f;--floor2:#a8977e;--deskc:#8a6f52;--deskt:#b79770;--glass:#a9cfe0;--screen:#16221c}}
+  :root[data-theme="light"]{--wall:#dfe8e1;--wall2:#cfdcd2;--floor:#b9a88f;--floor2:#a8977e;--deskc:#8a6f52;--deskt:#b79770;--glass:#a9cfe0;--screen:#16221c}
+  .office{margin-bottom:24px;border:1px solid var(--line);background:var(--panel);overflow:hidden}
+  .office .ohd{display:flex;justify-content:space-between;align-items:baseline;gap:4px 14px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .office svg{display:block;width:100%;height:auto}
+  .office .hot{cursor:pointer;outline:none}
+  .office .hot .lift{transition:transform .18s ease}
+  .office .hot:hover .lift,.office .hot:focus-visible .lift{transform:translateY(-4px)}
+  .office .hot:focus-visible .ring,.office .hot:hover .ring{opacity:1}
+  .office .ring{opacity:0;fill:none;stroke:var(--gold);stroke-width:3;stroke-dasharray:7 5;transition:opacity .15s}
+  .office .tx{font-family:var(--display);fill:var(--ink);letter-spacing:.04em}
+  .office .tx2{font-family:var(--body);fill:var(--ink2);font-size:11px}
+  .ocap{padding:10px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink2);min-height:42px;display:flex;gap:8px;align-items:center}
+  .ocap b{color:var(--ink)}
+  @media (prefers-reduced-motion: reduce){.office .hot .lift{transition:none}}
   *{box-sizing:border-box}
   body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;padding-inline:16px;padding-block:0 64px}
   .wrap{max-width:1060px;margin-inline:auto}
@@ -224,6 +242,11 @@
   <button role="tab" id="tab-legs" aria-selected="false" aria-controls="view-legs" class="tabbtn">PARLAY PAL</button>
 </nav>
 <div id="view-main" role="tabpanel" aria-labelledby="tab-main">
+<section class="office" aria-labelledby="officeh">
+  <div class="ohd"><h2 id="officeh">Melillo &amp; Co. Fantasy Football</h2><span class="meta">Click a desk, the whiteboard, the odds screen or the coach’s door</span></div>
+  <div id="officeSvg"></div>
+  <div class="ocap" id="ocap" aria-live="polite">Walk the floor. Each desk is one of your teams.</div>
+</section>
 <section class="cards" id="cards" aria-label="Teams"></section>
 
 <section class="panel" aria-labelledby="matrixh">
@@ -237,7 +260,7 @@
 
 
 <section class="panel moves" id="moves" aria-labelledby="movesh">
-  <div class="hd"><h2 id="movesh">Roster moves seen this season</h2><span class="meta">From each Sleeper league\u2019s transaction log</span></div>
+  <div class="hd"><h2 id="movesh">Roster moves seen this season</h2><span class="meta">From each Sleeper league’s transaction log</span></div>
   <div class="pad"><ul class="tight" id="movelist"></ul></div>
 </section>
 
@@ -556,6 +579,72 @@ render();
 function show(w){var legs=w==='legs';m.hidden=legs;l.hidden=!legs;bm.setAttribute('aria-selected',!legs);bl.setAttribute('aria-selected',legs);try{location.hash=legs?'legs':''}catch(e){}}
 bm.onclick=function(){show('main')};bl.onclick=function(){show('legs')};
 if(location.hash==='#legs')show('legs');})();
+</script>
+<script>
+(function(){
+  var $=function(q){return document.querySelector(q)};
+  var root=$('#officeSvg'); if(!root||typeof TEAMS==='undefined')return;
+  var desk=[
+    {id:'redraft',x:60},{id:'mdyn',x:270},{id:'dphi',x:480},{id:'eddie',x:690}
+  ];
+  var role={redraft:'Redraft desk',mdyn:'Dynasty desk',dphi:'Superflex desk',eddie:'ESPN desk'};
+  function avg(t){var ws=Object.keys(t.weeks);if(!ws.length)return null;var s=0;ws.forEach(function(w){s+=startTotal(t.weeks[w])});return s/ws.length}
+  var o='<svg viewBox="0 0 960 440" role="group" aria-label="Office floor with four team desks">';
+  o+='<rect width="960" height="300" fill="var(--wall)"/><rect y="270" width="960" height="30" fill="var(--wall2)"/><rect y="300" width="960" height="140" fill="var(--floor)"/>';
+  for(var i=0;i<12;i++)o+='<path d="M'+(i*90-60)+' 440 L'+(i*90+60)+' 300" stroke="var(--floor2)" stroke-width="1.5" opacity=".45"/>';
+  o+='<text class="tx" x="480" y="34" text-anchor="middle" font-size="26" font-weight="600" style="letter-spacing:.2em">MELILLO &amp; CO.</text>';
+  // window with skyline
+  o+='<g><rect x="30" y="58" width="200" height="130" fill="var(--glass)" stroke="var(--line)" stroke-width="3"/>';
+  [[40,130,28,58],[72,110,30,78],[106,140,26,48],[136,100,34,88],[174,125,24,63],[202,115,22,73]].forEach(function(b){o+='<rect x="'+b[0]+'" y="'+b[1]+'" width="'+b[2]+'" height="'+b[3]+'" fill="var(--wall2)" opacity=".85"/>'});
+  o+='<path d="M130 58V188M30 123H230" stroke="var(--line)" stroke-width="3"/></g>';
+  // whiteboard -> roster moves
+  o+='<g class="hot" id="h-board" role="button" tabindex="0" aria-label="Open roster moves whiteboard"><g class="lift"><rect x="268" y="60" width="230" height="122" fill="var(--panel)" stroke="var(--ink3)" stroke-width="4"/>';
+  o+='<text class="tx" x="283" y="86" font-size="22">ROSTER MOVES</text>';
+  [[283,104,170],[283,121,140],[283,138,185],[283,155,120]].forEach(function(l,i){o+='<rect x="'+l[0]+'" y="'+l[1]+'" width="'+l[2]+'" height="5" fill="'+['var(--a-redraft)','var(--a-mdyn)','var(--a-dphi)','var(--a-eddie)'][i]+'" opacity=".8"/>'});
+  o+='</g><rect class="ring" x="262" y="54" width="242" height="134"/></g>';
+  // odds screen -> parlay pal
+  o+='<g class="hot" id="h-tv" role="button" tabindex="0" aria-label="Open PARLAY PAL"><g class="lift"><rect x="540" y="56" width="250" height="126" rx="4" fill="var(--screen)" stroke="var(--ink3)" stroke-width="4"/>';
+  o+='<text x="556" y="86" font-family="var(--display)" font-size="26" fill="var(--gold)" style="letter-spacing:.08em">PARLAY PAL</text>';
+  [['LOCK',100,'var(--turf)'],['LOCK',122,'var(--gold)'],['LOCK',144,'var(--turf)']].forEach(function(r,i){o+='<rect x="556" y="'+(r[1])+'" width="'+[160,120,190][i]+'" height="10" fill="'+r[2]+'" opacity=".85"/><circle cx="'+(556+[160,120,190][i]+14)+'" cy="'+(r[1]+5)+'" r="4" fill="'+r[2]+'"/>'});
+  o+='<text x="556" y="172" font-family="var(--body)" font-size="11" fill="#9aa8a0">Tonight’s hit-rate legs</text></g><rect class="ring" x="534" y="50" width="262" height="138"/></g>';
+  // coach's door -> start/sit
+  o+='<g class="hot" id="h-door" role="button" tabindex="0" aria-label="Open the coach’s office, who to start"><g class="lift"><rect x="852" y="80" width="100" height="220" fill="var(--deskc)" stroke="var(--ink3)" stroke-width="3"/><rect x="864" y="98" width="76" height="56" fill="var(--glass)"/><circle cx="934" cy="214" r="5" fill="var(--gold)"/>';
+  o+='<text class="tx" x="902" y="182" text-anchor="middle" font-size="16" style="fill:var(--ink)">COACH</text><text class="tx2" x="902" y="198" text-anchor="middle" style="fill:var(--ink)">who to start</text></g><rect class="ring" x="846" y="74" width="112" height="232"/></g>';
+  // desks
+  desk.forEach(function(d){
+    var t=TEAMS.find(function(x){return x.id===d.id});if(!t)return;
+    var a=avg(t),c='var(--a-'+d.id+')',x=d.x;
+    o+='<g class="hot" id="h-'+d.id+'" role="button" tabindex="0" aria-label="Open '+t.name+'"><g class="lift">';
+    o+='<ellipse cx="'+(x+78)+'" cy="372" rx="70" ry="9" fill="#000" opacity=".18"/>';
+    o+='<rect x="'+(x+8)+'" y="326" width="140" height="10" fill="var(--deskc)"/><rect x="'+(x+14)+'" y="336" width="10" height="34" fill="var(--deskc)"/><rect x="'+(x+132)+'" y="336" width="10" height="34" fill="var(--deskc)"/>';
+    o+='<rect x="'+x+'" y="316" width="156" height="14" fill="var(--deskt)"/>';
+    // employee
+    o+='<circle cx="'+(x+116)+'" cy="262" r="15" fill="'+c+'"/><path d="M'+(x+94)+' 316 Q'+(x+96)+' 284 '+(x+116)+' 282 Q'+(x+136)+' 284 '+(x+138)+' 316Z" fill="'+c+'" opacity=".85"/>';
+    // monitor
+    o+='<rect x="'+(x+14)+'" y="252" width="92" height="58" rx="3" fill="var(--screen)" stroke="var(--ink3)" stroke-width="3"/><rect x="'+(x+56)+'" y="310" width="8" height="8" fill="var(--ink3)"/>';
+    o+='<text x="'+(x+60)+'" y="289" text-anchor="middle" font-family="var(--display)" font-size="30" font-weight="600" fill="'+c+'">'+(a==null?'--':a.toFixed(1))+'</text>';
+    o+='<text x="'+(x+60)+'" y="303" text-anchor="middle" font-family="var(--body)" font-size="9" fill="#9aa8a0">AVG PER WEEK</text>';
+    o+='</g><text class="tx" x="'+(x+78)+'" y="404" text-anchor="middle" font-size="19">'+t.name.toUpperCase()+'</text>';
+    o+='<text class="tx2" x="'+(x+78)+'" y="421" text-anchor="middle">'+role[d.id]+'</text>';
+    o+='<rect class="ring" x="'+(x-6)+'" y="240" width="168" height="188"/></g>';
+  });
+  o+='</svg>';
+  root.innerHTML=o;
+
+  var cap=$('#ocap'),def=cap.innerHTML;
+  function say(h){cap.innerHTML=h}
+  function go(el){var s=matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';try{el.scrollIntoView({behavior:s,block:'start'})}catch(e){}}
+  function bind(id,msg,fn){var n=$('#'+id);if(!n)return;
+    n.addEventListener('mouseenter',function(){say(msg)});n.addEventListener('focus',function(){say(msg)});
+    n.addEventListener('mouseleave',function(){say(def)});n.addEventListener('blur',function(){say(def)});
+    n.addEventListener('click',fn);n.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();fn()}});}
+  function team(id){var b=document.querySelector('.tcard[data-team="'+id+'"]');if(b)b.click()}
+  desk.forEach(function(d){var t=TEAMS.find(function(x){return x.id===d.id});if(!t)return;var a=avg(t);
+    bind('h-'+d.id,'<b>'+t.name+'</b> ('+t.platform+', '+t.type+')'+(a==null?'':' averaging '+a.toFixed(1)+' a week')+'. Click to open the lineups.',function(){team(d.id)})});
+  bind('h-board','<b>Whiteboard</b>: every add, drop and trade this season. Click to jump to it.',function(){go($('#moves'))});
+  bind('h-tv','<b>PARLAY PAL</b>: stat milestones that hit most often, with matchups and suggested parlays. Click to open.',function(){var b=$('#tab-legs');if(b)b.click();window.scrollTo(0,0)});
+  bind('h-door','<b>Coach’s office</b>: who to start this week. Opens Melillo Redraft; pick another desk for its lineup.',function(){team('redraft')});
+})();
 </script>
 <!--PARLAY-->
 
