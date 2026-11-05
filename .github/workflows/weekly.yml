@@ -6,6 +6,10 @@ on:
     # Tuesday catches Monday night's games; Wednesday catches late stat corrections.
     - cron: '0 14 * * 2'
     - cron: '0 14 * * 3'
+    # Pre-kickoff runs that send the parlay notifications (Thursday night, Sunday slates, Monday night).
+    - cron: '0 19 * * 4'
+    - cron: '30 15 * * 0'
+    - cron: '0 20 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -21,6 +25,8 @@ jobs:
           python-version: '3.12'
       - run: pip install pandas requests
       - run: python build.py
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'pp-683d1c80f045' }}
       - name: Commit changes
         run: |
           git config user.name "fantasy-control-room bot"

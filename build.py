@@ -325,6 +325,7 @@ def nfl_legs(state, own):
 
     nxt = max(int(state['week']), max_week + 1)
     sch = {}
+    games = []
     fx = {'LAR': 'LA', 'WSH': 'WAS'}
     try:
         sb = gj('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=%d' % nxt)
@@ -333,6 +334,7 @@ def nfl_legs(state, own):
             home = next(c for c in comp if c['homeAway'] == 'home')['team']['abbreviation']
             away = next(c for c in comp if c['homeAway'] == 'away')['team']['abbreviation']
             home, away = fx.get(home, home), fx.get(away, away)
+            games.append({'home': home, 'away': away, 'kick': e.get('date')})
             sch[home] = (away, 'vs')
             sch[away] = (home, '@')
     except Exception as ex:
@@ -398,7 +400,7 @@ def nfl_legs(state, own):
                     m['mu'] = x
         out.append(r)
     out.sort(key=lambda r: (-sum(m['h'] == m['n'] for m in r['ms']), -len(r['ms'])))
-    return {'rows': out, 'week': max_week}
+    return {'rows': out, 'week': max_week, 'next': nxt, 'games': games}
 
 
 # ----------------------------------------------------------------- college
@@ -698,6 +700,106 @@ def start_sit(res, players, ctx):
             'source': 'Sleeper projections' if any(c['src'] == 'proj' for c in cands.values()) else 'recent average'}
 
 
+def slot_name(kick):
+    """Slate label for a kickoff time (ET), or None for odd windows."""
+    t = dt.datetime.fromisoformat(kick.replace('Z', '+00:00')).astimezone(ET)
+    day, hr = t.strftime('%A'), t.hour + t.minute / 60
+    if hr >= 19.5:
+        return day + ' Night', True
+    if day == 'Sunday':
+        return ('Sunday 1 PM slate' if hr < 15.5 else 'Sunday 4 PM slate'), False
+    return None, False
+
+
+def leg_pick(r):
+    best = None
+    for m in r['ms']:
+        if m['h'] / m['n'] < 0.8:
+            continue
+        g = (m.get('mu') or {}).get('g', 'mid')
+        if g == 'tough':
+            continue
+        rk = (m.get('mu') or {}).get('rk', 40)
+        sc = m['h'] / m['n'] + (0.15 if g == 'soft' else 0) + (40 - min(rk, 40)) / 400 + (0.02 if m['n'] >= 6 else 0)
+        if not best or sc > best[0]:
+            best = (sc, m, g)
+    if not best:
+        return None
+    sc, m, g = best
+    return {'sc': sc, 'p': r['p'], 'tm': r['tm'], 'opp': r['opp'], 'ha': r.get('ha', ''), 'm': m['m'], 'h': m['h'], 'n': m['n'], 'g': g}
+
+
+def make_parlays(nfl):
+    if not nfl or not nfl.get('games'):
+        return []
+    legs = {}
+    for r in nfl['rows']:
+        if r.get('opp'):
+            p = leg_pick(r)
+            if p:
+                legs.setdefault(r['tm'], []).append(p)
+    for v in legs.values():
+        v.sort(key=lambda x: -x['sc'])
+    by_slot = {}
+    out = []
+    for g in nfl['games']:
+        if not g.get('kick'):
+            continue
+        name, prime = slot_name(g['kick'])
+        if not name:
+            continue
+        pool = sorted(legs.get(g['home'], [])[:3] + legs.get(g['away'], [])[:3], key=lambda x: -x['sc'])
+        pick, cnt = [], {}
+        for x in pool:
+            if cnt.get(x['tm'], 0) >= 2 or len(pick) >= 3:
+                continue
+            cnt[x['tm']] = cnt.get(x['tm'], 0) + 1
+            pick.append(x)
+        by_slot.setdefault(name, []).append((g, pool[0] if pool else None))
+        if prime:
+            out.append({'id': '%s-%s@%s' % (nfl['next'], g['away'], g['home']), 'kind': 'game', 'title': '%s: %s at %s' % (name, g['away'], g['home']),
+                        'kick': g['kick'], 'legs': pick if len(pick) >= 2 else []})
+    for name, items in by_slot.items():
+        if not name.startswith('Sunday') or 'Night' in name:
+            continue
+        top = sorted([b for _, b in items if b], key=lambda x: -x['sc'])[:4]
+        kick = min(g['kick'] for g, _ in items)
+        out.append({'id': '%s-%s' % (nfl['next'], name), 'kind': 'slate', 'title': name + ' (one leg per game)', 'kick': kick, 'legs': top if len(top) >= 2 else []})
+    out.sort(key=lambda x: x['kick'])
+    for x in out:
+        for l in x['legs']:
+            l.pop('sc', None)
+    return out
+
+
+def notify(parlays):
+    """Push each parlay to the phone once, shortly before kickoff (ntfy.sh topic from NTFY_TOPIC)."""
+    topic = os.environ.get('NTFY_TOPIC')
+    if not topic:
+        log('NTFY_TOPIC not set; skipping notifications')
+        return
+    sp = os.path.join(DATA, 'sent.json')
+    try:
+        sent = json.load(open(sp))
+    except Exception:
+        sent = []
+    now = dt.datetime.now(dt.timezone.utc)
+    for x in parlays:
+        k = dt.datetime.fromisoformat(x['kick'].replace('Z', '+00:00'))
+        if x['id'] in sent or not x['legs'] or not (dt.timedelta(0) < k - now <= dt.timedelta(hours=14)):
+            continue
+        lines = ['%s %s: %s %d/%d (%s)' % (l['p'], l['tm'] + (' at ' if l['ha'] == '@' else ' vs ') + l['opp'], l['m'], l['h'], l['n'], l['g']) for l in x['legs']]
+        body = '\n'.join(lines) + '\nStat milestones, not sportsbook lines. Check the price first.'
+        try:
+            r = SESSION.post('https://ntfy.sh/' + topic, data=body.encode('utf-8'), headers={'Title': 'Parlay Pal: ' + x['title']}, timeout=20)
+            r.raise_for_status()
+            sent.append(x['id'])
+            log('sent', x['title'])
+        except Exception as ex:
+            log('notification failed:', ex)
+    json.dump(sent[-60:], open(sp, 'w'))
+
+
 def read(name):
     with open(os.path.join(ROOT, name), encoding='utf-8') as f:
         return f.read()
@@ -749,10 +851,13 @@ def main():
 
     nfl = with_cache('nfl', lambda: nfl_legs(state, own))
     cfb = with_cache('college', lambda: college(state))
+    parlays = with_cache('parlays', lambda: make_parlays(nfl)) or []
+    if os.environ.get('NTFY_TOPIC'):
+        notify(parlays)
     through = max([int(w) for t in teams for w in t['weeks']] or [1])
 
     core = read('core_head.js') + 'const TEAMS = ' + json.dumps(teams, separators=(',', ':')) + ';\n\n' + read('core_tail.js')
-    ins = 'const INSIGHTS = ' + json.dumps(insights) + ';\nconst MOVES = ' + json.dumps(moves) + ';\nconst START = ' + json.dumps(start) + ';\n'
+    ins = 'const INSIGHTS = ' + json.dumps(insights) + ';\nconst MOVES = ' + json.dumps(moves) + ';\nconst START = ' + json.dumps(start) + ';\nconst PARLAYS = ' + json.dumps(parlays) + ';\n'
     meta = {'nflWeek': (nfl or {}).get('week', through), 'cfbThrough': (cfb or {}).get('through', '')}
     parlay = read('parlay.js').replace('__N__', json.dumps((nfl or {}).get('rows', []), separators=(',', ':'))) \
         .replace('__C__', json.dumps((cfb or {}).get('rows', []), separators=(',', ':'))) \
