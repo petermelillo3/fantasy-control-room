@@ -47,7 +47,7 @@
   .office .hot .lift{transition:transform .18s ease}
   .office .hot:hover .lift,.office .hot:focus-visible .lift{transform:translateY(-4px)}
   .office .hot:focus-visible .ring,.office .hot:hover .ring{opacity:1}
-  .office .ring{opacity:0;fill:none;stroke:var(--gold);stroke-width:3;stroke-dasharray:7 5;transition:opacity .15s}
+  .office .ring{pointer-events:all;opacity:0;fill:none;stroke:var(--gold);stroke-width:3;stroke-dasharray:7 5;transition:opacity .15s}
   .office .tx{font-family:var(--display);fill:var(--ink);letter-spacing:.04em}
   .office .tx2{font-family:var(--body);fill:var(--ink2);font-size:11px}
   .ocap{padding:10px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink2);min-height:42px;display:flex;gap:8px;align-items:center}
@@ -61,7 +61,7 @@
   .floor .bot{cursor:pointer;outline:none}
   .floor .bot .lift{transition:transform .18s ease}
   .floor .bot:hover .lift,.floor .bot:focus-visible .lift,.floor .bot[aria-pressed="true"] .lift{transform:translateY(-5px)}
-  .floor .bot .ring{opacity:0;fill:none;stroke:var(--gold);stroke-width:3;stroke-dasharray:7 5}
+  .floor .bot .ring{pointer-events:all;opacity:0;fill:none;stroke:var(--gold);stroke-width:3;stroke-dasharray:7 5}
   .floor .bot:hover .ring,.floor .bot:focus-visible .ring,.floor .bot[aria-pressed="true"] .ring{opacity:1}
   .floor .tx{font-family:var(--display);fill:var(--ink);letter-spacing:.04em}
   .floor .tx2{font-family:var(--body);fill:var(--ink2);font-size:11px}
@@ -655,7 +655,7 @@ o+='<rect class="ring" x="'+(cx-100)+'" y="168" width="204" height="238"/></g></
 o+='</svg>';root.innerHTML=o;
 var cap=document.getElementById('floorcap'),det=document.getElementById('floorDetail'),def=cap.innerHTML,sel=-1;
 function card(x){if(!x.legs.length)return '<b>'+esc(x.title)+'</b><p class="note" style="margin:6px 0 0">'+when(x.kick)+'. No leg cleared the 80% hit-rate bar against a fair matchup, so this robot is napping and nothing is sent for it.</p>';
-return '<div class="sg" style="max-width:520px"><b class="sgt">'+esc(x.title)+'</b><span class="note">'+when(x.kick)+'</span><ul class="bbl1" style="margin-top:8px">'+x.legs.map(function(l){var ln=l.odds==null?'<span class="note">Model '+pc(l.prob||0)+' · no line posted yet</span>':'<span class="note">Model '+pc(l.prob)+' · '+esc(l.book)+' '+od(l.odds)+' ('+pc(l.imp)+')</span> <span class="mu '+(l.v==='value'?'soft':l.v==='poor'?'tough':'mid')+'">'+(l.v==='value'?'Value':l.v==='poor'?'Poor line':'Fair')+' '+(l.edge>0?'+':'')+Math.round(l.edge*100)+'</span>';return '<li><b>'+esc(l.p)+'</b> <span class="note">'+esc(l.tm)+(l.ha==='@'?' at ':' vs ')+esc(l.opp)+'</span><br>'+esc(l.m)+' <span class="hit">'+l.h+'/'+l.n+'</span> <span class="mu '+l.g+'">'+(l.g==='soft'?'Soft':'Even')+'</span><br>'+ln+'</li>'}).join('')+'</ul></div>'}
+return '<div class="sg" style="max-width:520px"><b class="sgt">'+esc(x.title)+'</b><span class="note">'+when(x.kick)+'</span><ul class="bbl1" style="margin-top:8px">'+x.legs.map(function(l){var ln=l.odds==null?'<span class="note">Model '+pc(l.prob||0)+' · no line posted yet</span>':'<span class="note">Model '+pc(l.prob)+' · '+esc(l.book)+' '+od(l.odds)+' ('+pc(l.imp)+')</span> <span class="mu '+(l.v==='value'?'soft':l.v==='poor'?'tough':'mid')+'">'+(l.v==='value'?'Value':l.v==='poor'?'Poor line':'Fair')+' '+(l.edge>0?'+':'')+Math.round(l.edge*100)+'</span>';return '<li><b>'+esc(l.p)+'</b> <span class="note">'+esc(l.tm)+(l.ha==='@'?' at ':' vs ')+esc(l.opp)+'</span><br>'+esc(l.m)+' <span class="hit">'+l.h+'/'+l.n+'</span> <span class="mu '+l.g+'">'+(l.g==='soft'?'Soft':'Even')+'</span><br>'+ln+(l.note?'<br><span class="note"><b>Research:</b> '+esc(l.note)+'</span>':'')+'</li>'}).join('')+'</ul></div>'}
 function pick(i){sel=i;P.forEach(function(_,j){document.getElementById('b'+j).setAttribute('aria-pressed',j===i)});det.innerHTML=card(P[i])}
 function msg(x){return '<b>'+nm(x.title)+'</b> on '+esc(sub(x))+(x.legs.length?': '+x.legs.length+' legs, best bet '+esc(x.legs[0].p)+' '+esc(x.legs[0].m)+'. Click for the parlay.':': napping, no qualifying legs.')}
 P.forEach(function(x,i){var n=document.getElementById('b'+i);
@@ -673,7 +673,8 @@ document.getElementById('slatemeta').textContent=P.length?P.length+' parlays thi
 function when(k){try{return new Date(k).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' ET'}catch(e){return ''}}
 function od(o){return (o>0?'+':'')+o}
 function pc(x){return Math.round(x*100)+'%'}
-function line(l){if(l.odds==null)return '<span class="note">Model '+pc(l.prob)+' · no line posted yet</span>';
+function line(l){return line0(l)+(l.note?'<br><span class="note"><b>Research:</b> '+esc(l.note)+'</span>':'')}
+function line0(l){if(l.odds==null)return '<span class="note">Model '+pc(l.prob)+' · no line posted yet</span>';
 var e=Math.round(l.edge*100),lab=l.v==='value'?'Value':(l.v==='poor'?'Poor line':'Fair');
 return '<span class="note">Model '+pc(l.prob)+' · '+esc(l.book)+' '+od(l.odds)+' ('+pc(l.imp)+')'+(l.pt!=null&&l.pt!==0.5?' at '+l.pt:'')+'</span> <span class="mu '+(l.v==='value'?'soft':(l.v==='poor'?'tough':'mid'))+'">'+lab+' '+(e>0?'+':'')+e+'</span>'+(l.hist&&l.hist.length>1?'<span class="note"> · moved '+l.hist.map(function(h){return od(h[1])}).join(' → ')+'</span>':'')}
 g.innerHTML=P.length?P.map(function(x){return '<div class="sg"><b class="sgt">'+esc(x.title)+'</b><span class="note">'+when(x.kick)+'</span><ul class="bbl1" style="margin-top:8px">'+x.legs.map(function(l){return '<li><b>'+esc(l.p)+'</b> <span class="note">'+esc(l.tm)+(l.ha==='@'?' at ':' vs ')+esc(l.opp)+'</span><br>'+esc(l.m)+' <span class="hit">'+l.h+'/'+l.n+'</span> <span class="mu '+l.g+'">'+(l.g==='soft'?'Soft':'Even')+'</span><br>'+line(l)+'</li>'}).join('')+'</ul></div>'}).join(''):'<p class="note">No parlays yet this week. They appear once the schedule and game logs are loaded.</p>';
