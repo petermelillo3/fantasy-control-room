@@ -900,9 +900,15 @@ def attach_lines(parlays, week):
         picks = []
     have = {(x['week'], x['p'], x['m']) for x in picks}
     stamp = dt.datetime.now(ET).strftime('%b %d %I:%M %p')
+    try:
+        notes = json.load(open(os.path.join(DATA, 'research.json')))
+    except Exception:
+        notes = {}
     for x in parlays:
         for l in x['legs']:
             l['prob'] = model_prob(l)
+            if notes.get(l['p'] + '|' + l['m']):
+                l['note'] = notes[l['p'] + '|' + l['m']]
             ln = lines.get((l['p'].lower(), l['m']))
             if ln:
                 imp = implied(ln['odds'])
