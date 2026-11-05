@@ -75,6 +75,8 @@
   .fdetail{padding:14px 16px;border-top:1px solid var(--line)}
   .fdetail:empty{display:none}
   @media (prefers-reduced-motion: reduce){.floor .eye,.floor .bulb,.floor .tick{animation:none}.floor .bot .lift{transition:none}}
+  header.top.pp{background:linear-gradient(180deg,color-mix(in srgb,var(--gold) 20%,var(--bg)),var(--bg)),repeating-linear-gradient(90deg,var(--stripe) 0 64px,transparent 64px 128px)}
+  nav.tabs{margin-top:16px}
   *{box-sizing:border-box}
   body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;padding-inline:16px;padding-block:0 64px}
   .wrap{max-width:1060px;margin-inline:auto}
@@ -244,10 +246,16 @@
 </style>
 
 <div class="wrap">
+
+<nav class="tabs" role="tablist" aria-label="Dashboard sections">
+  <button role="tab" id="tab-main" aria-selected="true" aria-controls="view-main" class="tabbtn">Fantasy Room</button>
+  <button role="tab" id="tab-legs" aria-selected="false" aria-controls="view-legs" class="tabbtn">Parlay Pal Room</button>
+</nav>
+<div id="view-main" role="tabpanel" aria-labelledby="tab-main">
 <header class="top">
   <div class="top-in">
     <div>
-      <div class="eyebrow">Four teams, one view</div>
+      <div class="eyebrow">Room 1 of 2 · Four teams, one view</div>
       <h1>Fantasy Control Room</h1>
       <p class="sub">Starter points, best possible lineups and the weak spots that keep coming back. Scores are copied from each platform's own weekly roster view, so they use each league's real scoring.</p>
     </div>
@@ -257,13 +265,7 @@
     <div class="ticks" id="ticks"></div>
     <div class="cap"><span>Week 1</span><span id="capmid">Through Week __THROUGH__ of 18</span><span>Week 18</span></div>
   </div>
-</header>
-
-<nav class="tabs" role="tablist" aria-label="Dashboard sections">
-  <button role="tab" id="tab-main" aria-selected="true" aria-controls="view-main" class="tabbtn">Control Room</button>
-  <button role="tab" id="tab-legs" aria-selected="false" aria-controls="view-legs" class="tabbtn">PARLAY PAL</button>
-</nav>
-<div id="view-main" role="tabpanel" aria-labelledby="tab-main">
+<div class="top-in" style="margin-top:18px"><div><button class="tabbtn" id="go-pp" type="button">Go to the Parlay Pal room →</button></div></div></header>
 <section class="office" aria-labelledby="officeh">
   <div class="ohd"><h2 id="officeh">Melillo &amp; Co. Fantasy Football</h2><span class="meta">Click a desk, the whiteboard, the odds screen or the coach’s door</span></div>
   <div id="officeSvg"></div>
@@ -305,7 +307,7 @@
 </section>
 </div>
 <div id="view-legs" role="tabpanel" aria-labelledby="tab-legs" hidden>
-<div class="pad legintro"><h2 class="legh">PARLAY PAL</h2><p class="sub">Milestones players clear almost every week, across the NFL and Power 5 college football. NFL players on your teams are tagged.</p></div>
+<header class="top pp"><div class="top-in"><div><div class="eyebrow">Room 2 of 2 · Stat milestones, matchups and prices</div><h1>Parlay Pal Room</h1><p class="sub">Milestones players clear almost every week, across the NFL and Power 5 college football, with a robot on every primetime game and Sunday slate. NFL players on your teams are tagged.</p></div><div><button class="tabbtn" id="go-fr" type="button">← Back to the Fantasy room</button></div></div></header>
 <section class="floor" aria-labelledby="floorh">
   <div class="ohd"><h2 id="floorh">The trading floor</h2><span class="meta">One robot per primetime game and slate. Click one for its parlay.</span></div>
   <div id="floorSvg"></div>
@@ -611,6 +613,7 @@ render();
 (function(){var m=document.getElementById('view-main'),l=document.getElementById('view-legs'),bm=document.getElementById('tab-main'),bl=document.getElementById('tab-legs');
 function show(w){var legs=w==='legs';m.hidden=legs;l.hidden=!legs;bm.setAttribute('aria-selected',!legs);bl.setAttribute('aria-selected',legs);try{location.hash=legs?'legs':''}catch(e){}}
 bm.onclick=function(){show('main')};bl.onclick=function(){show('legs')};
+var g1=document.getElementById('go-pp'),g2=document.getElementById('go-fr');if(g1)g1.onclick=function(){show('legs');window.scrollTo(0,0)};if(g2)g2.onclick=function(){show('main');window.scrollTo(0,0)};
 if(location.hash==='#legs')show('legs');})();
 </script>
 <script>
@@ -754,7 +757,7 @@ lc.innerHTML=h;}
   desk.forEach(function(d){var t=TEAMS.find(function(x){return x.id===d.id});if(!t)return;var a=avg(t);
     bind('h-'+d.id,'<b>'+t.name+'</b> ('+t.platform+', '+t.type+')'+(a==null?'':' averaging '+a.toFixed(1)+' a week')+'. Click to open the lineups.',function(){team(d.id)})});
   bind('h-board','<b>Whiteboard</b>: every add, drop and trade this season. Click to jump to it.',function(){go($('#moves'))});
-  bind('h-tv','<b>PARLAY PAL</b>: stat milestones that hit most often, with matchups and suggested parlays. Click to open.',function(){var b=$('#tab-legs');if(b)b.click();window.scrollTo(0,0)});
+  bind('h-tv','<b>Parlay Pal room</b>: robots on every primetime game and slate, with lines and research. Click to walk in.',function(){var b=$('#tab-legs');if(b)b.click();window.scrollTo(0,0)});
   bind('h-door','<b>Coach’s office</b>: who to start this week. Opens Melillo Redraft; pick another desk for its lineup.',function(){team('redraft')});
 })();
 </script>
