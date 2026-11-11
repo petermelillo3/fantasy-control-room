@@ -447,7 +447,7 @@ def college(state):
             elif day >= today:
                 home = next(c for c in comp if c['homeAway'] == 'home')['team']
                 away = next(c for c in comp if c['homeAway'] == 'away')['team']
-                upcoming.append((day, str(home['id']), str(away['id']), home['shortDisplayName'], away['shortDisplayName']))
+                upcoming.append((day, str(home['id']), str(away['id']), home['shortDisplayName'], away['shortDisplayName'], e.get('date')))
 
     def summary(eid):
         try:
@@ -511,9 +511,9 @@ def college(state):
     q = round(N / 4)
 
     nxt = {}
-    for day, h, a, hn, an in sorted(upcoming, key=lambda x: x[0]):
-        nxt.setdefault(h, (an, a, 'vs'))
-        nxt.setdefault(a, (hn, h, '@'))
+    for day, h, a, hn, an, kk in sorted(upcoming, key=lambda x: x[0]):
+        nxt.setdefault(h, (an, a, 'vs', kk))
+        nxt.setdefault(a, (hn, h, '@', kk))
 
     MS = [('py', 'pass yds', [250, 300, 350], 'Q'), ('ptd', 'pass TDs', [2, 3], 'Q'), ('ry', 'rush yds', [50, 75, 100], 'R'),
           ('rec', 'rec', [4, 5, 6, 7], 'W'), ('cy', 'rec yds', [50, 75, 100], 'W'),
@@ -549,8 +549,8 @@ def college(state):
             continue
         r = {'p': p['nm'], 'pos': pos, 'tm': p['tn'], 'cf': tc[tid], 'ms': ms, 'opp': None}
         if tid in nxt:
-            opn, oid, ha = nxt[tid]
-            r['opp'], r['ha'] = opn, ha
+            opn, oid, ha, kk = nxt[tid]
+            r['opp'], r['ha'], r['kick'] = opn, ha, kk
             if oid in al:
                 o = al[oid]
                 for m in ms:
@@ -932,6 +932,48 @@ def attach_lines(parlays, week):
     return bool(lines)
 
 
+def cfb_slot(kick):
+    t = dt.datetime.fromisoformat(kick.replace('Z', '+00:00')).astimezone(ET)
+    hr = t.hour + t.minute / 60
+    if t.strftime('%A') == 'Friday':
+        return 'Friday Night'
+    if t.strftime('%A') != 'Saturday':
+        return None
+    return 'Saturday noon' if hr < 14 else ('Saturday afternoon' if hr < 19 else 'Saturday night')
+
+
+def make_college_parlays(cfb):
+    if not cfb or not cfb.get('rows'):
+        return []
+    by = {}
+    for r in cfb['rows']:
+        if not r.get('opp') or not r.get('kick'):
+            continue
+        slot = cfb_slot(r['kick'])
+        p = leg_pick(r)
+        if not slot or not p:
+            continue
+        p['gk'] = ' vs '.join(sorted([r['tm'], r['opp']]))
+        day = dt.datetime.fromisoformat(r['kick'].replace('Z', '+00:00')).astimezone(ET).strftime('%m%d')
+        by.setdefault((day, slot), {'kick': r['kick'], 'legs': []})
+        by[(day, slot)]['kick'] = min(by[(day, slot)]['kick'], r['kick'])
+        by[(day, slot)]['legs'].append(p)
+    out = []
+    for (day, slot), v in by.items():
+        best = {}
+        for p in sorted(v['legs'], key=lambda x: -x['sc']):
+            best.setdefault(p['gk'], p)
+        top = sorted(best.values(), key=lambda x: -x['sc'])[:4]
+        legs = []
+        for p in top:
+            p.pop('sc', None); p.pop('gk', None)
+            legs.append(p)
+        out.append({'id': 'cfb-%s-%s' % (day, slot), 'kind': 'slate', 'sport': 'cfb', 'title': ('College %s slate (one leg per game)' % slot) if slot != 'Friday Night' else 'College Friday night slate',
+                    'kick': v['kick'], 'legs': legs if len(legs) >= 2 else []})
+    out.sort(key=lambda x: x['kick'])
+    return out
+
+
 def notify(parlays):
     """Push each parlay to the phone once, shortly before kickoff (ntfy.sh topic from NTFY_TOPIC)."""
     topic = os.environ.get('NTFY_TOPIC')
@@ -1012,11 +1054,17 @@ def main():
     nfl = with_cache('nfl', lambda: nfl_legs(state, own))
     cfb = with_cache('college', lambda: college(state))
     parlays = make_parlays(nfl) if nfl else []
-    if parlays:
-        try:
-            attach_lines(parlays, int(nfl.get('next', 0)))
-        except Exception as ex:
-            log('line check failed:', ex)
+    cparl = make_college_parlays(cfb) if cfb else []
+    if parlays or cparl:
+        if parlays:
+            try:
+                attach_lines(parlays, int(nfl.get('next', 0)))
+            except Exception as ex:
+                log('line check failed:', ex)
+        for x in cparl:
+            for l in x['legs']:
+                l['prob'] = model_prob(l)
+        parlays = parlays + cparl
         with open(cache_path('parlays'), 'w') as f:
             json.dump(parlays, f, separators=(',', ':'))
     else:
