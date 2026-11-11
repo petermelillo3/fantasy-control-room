@@ -623,7 +623,7 @@ function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp
 function od(o){return (o>0?'+':'')+o}function pc(x){return Math.round(x*100)+'%'}
 function when(k){try{return new Date(k).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' ET'}catch(e){return ''}}
 var P=PARLAYS.slice(),cols=['var(--turf)','var(--gold)','var(--a-dphi)','var(--a-eddie)','var(--bad)'];
-function nm(t,c){if(c==='cfb'){if(/afternoon/.test(t))return 'AFTN-BOT';if(/noon/.test(t))return 'NOON-BOT';if(/night/.test(t))return 'NIGHT-BOT';return 'FRI-BOT'}if(/Thursday/.test(t))return 'THURS-BOT';if(/Friday/.test(t))return 'FRI-BOT';if(/Saturday/.test(t))return 'SAT-BOT';if(/Monday/.test(t))return 'MONDAY-BOT';if(/Sunday Night/.test(t))return 'SUNDAY-BOT';if(/1 PM/.test(t))return 'EARLY-BOT';if(/4 PM/.test(t))return 'LATE-BOT';return 'BOT'}
+function nm(t,c){if(c==='cfb'){if(/afternoon/.test(t))return 'AFTN-BOT';if(/noon/.test(t))return 'NOON-BOT';if(/Friday/.test(t))return 'FRI-BOT';return 'NIGHT-BOT'}if(/Thursday/.test(t))return 'THURS-BOT';if(/Friday/.test(t))return 'FRI-BOT';if(/Saturday/.test(t))return 'SAT-BOT';if(/Monday/.test(t))return 'MONDAY-BOT';if(/Sunday Night/.test(t))return 'SUNDAY-BOT';if(/1 PM/.test(t))return 'EARLY-BOT';if(/4 PM/.test(t))return 'LATE-BOT';return 'BOT'}
 function sub(x){var m=x.title.match(/: (.+)$/);return m&&x.kind==='game'?m[1]:x.title.replace(/ \(.*\)/,'')}
 function flag(x){var v=0,p=0;x.legs.forEach(function(l){if(l.v==='value')v++;if(l.v==='poor')p++});return v?'value':(p?'poor':'')}
 if(!P.length){root.innerHTML='<p class="note" style="padding:16px">No robots on shift yet. They clock in once the schedule and game logs load.</p>';return}
