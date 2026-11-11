@@ -300,7 +300,7 @@
   <div class="hd"><h2 id="srch">Sources</h2></div>
   <div class="pad">
     <ul class="tight" style="--m:var(--ink3)">
-      <li>Scores, rosters and roster moves: the public <a href="https://docs.sleeper.com/">Sleeper API</a> for your three Sleeper leagues. Updated Nov 10, 2026 at 07:02 PM ET.</li>
+      <li>Scores, rosters and roster moves: the public <a href="https://docs.sleeper.com/">Sleeper API</a> for your three Sleeper leagues. Updated Nov 10, 2026 at 07:03 PM ET.</li>
       <li>NFL game stats: <a href="https://github.com/nflverse/nflverse-data">nflverse</a>. NFL schedule and college football box scores: ESPN's public scoreboard data.</li>
       <li>The Eddie Pineiro (ESPN) team is entered by hand and is not part of the weekly refresh.</li>
     </ul>
@@ -674,11 +674,11 @@ function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp
 function od(o){return (o>0?'+':'')+o}function pc(x){return Math.round(x*100)+'%'}
 function when(k){try{return new Date(k).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' ET'}catch(e){return ''}}
 var P=PARLAYS.slice(),cols=['var(--turf)','var(--gold)','var(--a-dphi)','var(--a-eddie)','var(--bad)'];
-function nm(t,c){if(c==='cfb'){if(/noon/.test(t))return 'NOON-BOT';if(/afternoon/.test(t))return 'AFTN-BOT';if(/night/.test(t))return 'NIGHT-BOT';return 'FRI-BOT'}if(/Thursday/.test(t))return 'THURS-BOT';if(/Friday/.test(t))return 'FRI-BOT';if(/Saturday/.test(t))return 'SAT-BOT';if(/Monday/.test(t))return 'MONDAY-BOT';if(/Sunday Night/.test(t))return 'SUNDAY-BOT';if(/1 PM/.test(t))return 'EARLY-BOT';if(/4 PM/.test(t))return 'LATE-BOT';return 'BOT'}
+function nm(t,c){if(c==='cfb'){if(/afternoon/.test(t))return 'AFTN-BOT';if(/noon/.test(t))return 'NOON-BOT';if(/night/.test(t))return 'NIGHT-BOT';return 'FRI-BOT'}if(/Thursday/.test(t))return 'THURS-BOT';if(/Friday/.test(t))return 'FRI-BOT';if(/Saturday/.test(t))return 'SAT-BOT';if(/Monday/.test(t))return 'MONDAY-BOT';if(/Sunday Night/.test(t))return 'SUNDAY-BOT';if(/1 PM/.test(t))return 'EARLY-BOT';if(/4 PM/.test(t))return 'LATE-BOT';return 'BOT'}
 function sub(x){var m=x.title.match(/: (.+)$/);return m&&x.kind==='game'?m[1]:x.title.replace(/ \(.*\)/,'')}
 function flag(x){var v=0,p=0;x.legs.forEach(function(l){if(l.v==='value')v++;if(l.v==='poor')p++});return v?'value':(p?'poor':'')}
 if(!P.length){root.innerHTML='<p class="note" style="padding:16px">No robots on shift yet. They clock in once the schedule and game logs load.</p>';return}
-var per=5,rowOf=[],rn=0;[P.filter(function(x){return x.sport!=='cfb'}),P.filter(function(x){return x.sport==='cfb'})].forEach(function(g){for(var i=0;i<g.length;i+=per){g.slice(i,i+per).forEach(function(x,k){x._r=rn;x._k=k;x._n=Math.min(per,g.length-i)});rn++}});P.sort(function(a,b){return a._r-b._r||a._k-b._k});var rows=rn,H=420+190*(rows-1),o='<svg viewBox="0 0 960 '+H+'" role="group" aria-label="Trading floor with one robot per parlay">';
+var per=5,rowOf=[],rn=0;[P.filter(function(x){return x.sport!=='cfb'}),P.filter(function(x){return x.sport==='cfb'})].forEach(function(g){for(var i=0;i<g.length;i+=per){g.slice(i,i+per).forEach(function(x,k){x._r=rn;x._k=k;x._n=Math.min(per,g.length-i)});rn++}});P.sort(function(a,b){return a._r-b._r||a._k-b._k});var rows=rn,H=420+250*(rows-1),o='<svg viewBox="0 0 960 '+H+'" role="group" aria-label="Trading floor with one robot per parlay">';
 o+='<rect width="960" height="'+H+'" fill="var(--wall)"/><rect y="200" width="960" height="'+(H-200)+'" fill="var(--floor)"/><rect y="190" width="960" height="12" fill="var(--wall2)"/>';
 // ticker
 var items=[];P.forEach(function(x){x.legs.forEach(function(l){if(l.odds!=null)items.push(l.p+' '+l.m+' '+od(l.odds)+' '+(l.v==='value'?'VALUE':l.v==='poor'?'POOR':'FAIR'))})});
@@ -690,7 +690,7 @@ o+='<g clip-path="url(#tkc)"><g class="tick"><text x="225" y="51" font-family="v
 // wall decor
 o+='<rect x="30" y="92" width="150" height="84" fill="var(--glass)" stroke="var(--line)" stroke-width="3"/><path d="M105 92V176M30 134H180" stroke="var(--line)" stroke-width="3"/>';
 o+='<text class="tx" x="480" y="140" text-anchor="middle" font-size="34" style="letter-spacing:.28em;opacity:.55">PARLAY PAL TRADING</text>';
-P.forEach(function(x,i){var r=x._r,n=x._n,k=x._k,w=960/n,cx=w*k+w/2,y0=r*190,c=x.sport==='cfb'?'var(--cfb)':cols[i%cols.length],sleep=!x.legs.length,f=flag(x);
+P.forEach(function(x,i){var r=x._r,n=x._n,k=x._k,w=960/n,cx=w*k+w/2,y0=r*250,c=x.sport==='cfb'?'var(--cfb)':cols[i%cols.length],sleep=!x.legs.length,f=flag(x);
 o+='<g class="bot" id="b'+i+'" role="button" tabindex="0" aria-pressed="false" aria-label="'+esc(x.title)+'"><g transform="translate(0,'+y0+')"><g class="lift">';
 o+='<ellipse cx="'+cx+'" cy="352" rx="84" ry="8" fill="#000" opacity=".18"/>';
 // robot
